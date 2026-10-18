@@ -6,6 +6,7 @@ import argparse
 from contextlib import redirect_stdout, redirect_stderr
 import io
 import json
+import math
 import pathlib
 from tempfile import TemporaryDirectory
 import types
@@ -93,11 +94,11 @@ class FakeModel:
 
     def inference_zero_shot(self, tts, prompt, reference, stream, speed):
         self.mode, self.text, self.context = "zero_shot", tts, prompt
-        return iter([{"tts_speech": FakeWave([0.1] * 160)}])
+        return iter([{"tts_speech": FakeWave([0.1 if i % 2 else -0.1 for i in range(160)])}])
 
     def inference_instruct2(self, tts, direction, reference, stream, speed):
         self.mode, self.text, self.context = "instruct2", tts, direction
-        return iter([{"tts_speech": FakeWave([0.2] * 160)}])
+        return iter([{"tts_speech": FakeWave([0.2 if i % 2 else -0.2 for i in range(160)])}])
 
 
 class PilotTests(unittest.TestCase):
@@ -199,6 +200,8 @@ class PilotTests(unittest.TestCase):
         self.assertTrue(result["fp16"])
         self.assertEqual(result["sample_rate"], 24000)
         self.assertEqual(result["sample_count"], 160)
+        self.assertEqual(result["audio_diagnostics"]["nonfinite_count"], 0)
+        self.assertEqual(result["audio_diagnostics"]["peak_abs"], 0.1)
         self.assertEqual(result["device_after_render"]["cuda_peak_allocated_bytes"], 3_100_000_000)
         self.assertTrue(self.output.read_bytes().startswith(b"RIFF"))
 
@@ -224,6 +227,76 @@ class PilotTests(unittest.TestCase):
              mock.patch.object(pilot, "import_official_model", return_value=lambda **kw: Broken()):
             with self.assertRaises(RuntimeError):
                 pilot.render(self.args())
+        self.assertFalse(self.output.exists())
+
+    def test_pcm16_all_negative_full_scale_is_rejected(self):
+        # Regression: the user's saved 1.36 s WAV had every sample = -32768
+        # (decoded float -1.0); writing this must never report "success".
+        with self.assertRaises(pilot.InvalidGeneratedAudio) as raised:
+            pilot.inspect_generated_audio([-1.0] * 32640)
+        self.assertEqual(raised.exception.code, "generated_audio_constant")
+        self.assertEqual(raised.exception.diagnostics["min"], -1.0)
+        self.assertEqual(raised.exception.diagnostics["clipped_fraction"], 1.0)
+
+    def test_nan_waveform_rejected_before_soundfile_can_turn_nan_to_minus_one(self):
+        for bad in [float("nan"), float("inf"), float("-inf")]:
+            with self.subTest(bad=bad):
+                with self.assertRaises(pilot.InvalidGeneratedAudio) as raised:
+                    pilot.inspect_generated_audio([bad] * 160)
+                self.assertEqual(raised.exception.code, "generated_audio_nonfinite")
+                self.assertEqual(raised.exception.diagnostics["nonfinite_count"], 160)
+
+    def test_fully_silent_and_heavily_clipped_waveforms_are_rejected(self):
+        for signal, reason in [
+            ([0.0] * 160, "generated_audio_silent"),
+            ([1.0 if i % 2 else -1.0 for i in range(160)], "generated_audio_clipped"),
+            ([0.01 if i % 2 else -3.0 for i in range(160)], "generated_audio_clipped"),
+        ]:
+            with self.subTest(reason=reason):
+                with self.assertRaises(pilot.InvalidGeneratedAudio) as raised:
+                    pilot.inspect_generated_audio(signal)
+                self.assertEqual(raised.exception.code, reason)
+
+    def test_healthy_varying_waveform_passes_and_has_nonzero_rms(self):
+        diag = pilot.inspect_generated_audio([0.2 if i % 2 else -0.2 for i in range(160)])
+        self.assertEqual(diag["nonfinite_count"], 0)
+        self.assertEqual(diag["clipped_fraction"], 0.0)
+        self.assertEqual(diag["peak_abs"], 0.2)
+        self.assertGreater(diag["rms"], 0.1)
+
+    def test_corrupted_real_model_output_does_not_publish_a_wav(self):
+        torch, sf, _ = fake_modules()
+
+        class Corrupt(FakeModel):
+            def inference_zero_shot(self, *args, **kwargs):
+                return iter([{"tts_speech": FakeWave([math.nan] * 160)}])
+
+        with mock.patch.dict("sys.modules", {"torch": torch, "soundfile": sf}), \
+             mock.patch.object(pilot, "import_official_model", return_value=lambda **kw: Corrupt()):
+            with self.assertRaises(pilot.InvalidGeneratedAudio) as raised:
+                pilot.render(self.args())
+        self.assertEqual(raised.exception.code, "generated_audio_nonfinite")
+        self.assertFalse(self.output.exists())
+
+    def test_corrupt_waveform_error_has_machine_readable_diagnostics(self):
+        output = io.StringIO()
+        cmd = [
+            "render", "--model-dir", str(self.model),
+            "--cosyvoice-repo", str(self.repo), "--text", "The storm was coming.",
+            "--reference-wav", str(self.wav),
+            "--output-wav", str(self.output),
+            "--direction", "Documentary voice", "--try-anyway",
+        ]
+        error = pilot.InvalidGeneratedAudio(
+            "generated_audio_constant",
+            {"sample_count": 32640, "min": -1.0, "max": -1.0, "clipped_fraction": 1.0},
+        )
+        with mock.patch.object(pilot, "render", side_effect=error), redirect_stdout(output):
+            code = pilot.main(cmd)
+        result = json.loads(output.getvalue())
+        self.assertEqual(code, 2)
+        self.assertEqual(result["reason"], "generated_audio_constant")
+        self.assertEqual(result["audio_diagnostics"]["clipped_fraction"], 1.0)
         self.assertFalse(self.output.exists())
 
     def test_render_runtime_error_explains_the_cause_without_dumping_a_traceback(self):
