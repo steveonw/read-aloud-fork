@@ -31,6 +31,8 @@ node scripts/stress_tests.js .
 
 A separate workflow `.github/workflows/m0-baseline.yml` runs those baseline checks in GitHub Actions on pull requests and this import branch.
 
+Quick baseline verification: [GitHub Actions run #39091923320](https://github.com/steveonw/read-aloud-fork/actions/runs/39091923320) — **SUCCESS**, including Bash syntax checks.
+
 The **full USB bundle smoke test** additionally needs Emscripten, CMake, Ninja, external voice/model downloads, and the original `build-usb.yml` workflow. A green quick CI check does **not** prove the complete USB build, real speech playback, runtime browser smoke, or export paths. Those remain independently required to mark *all* of M0 complete.
 
 ## M0 acceptance log
@@ -41,8 +43,8 @@ The **full USB bundle smoke test** additionally needs Emscripten, CMake, Ninja, 
 | Source/text/fonts/vendor assets available in new Git repo | Done |
 | Upstream files' Git blob SHA verified during import | Done |
 | Original license notices and attribution kept | Done |
-| Go unit/vet/build | **Await GitHub Actions result** |
-| JavaScript unit/stress tests | **Await GitHub Actions result** |
+| Go unit/vet/build | **PASS** — Ubuntu 24.04, Go 1.23; `go test ./cmd/...`, `go vet ./...`, `go build` |
+| JavaScript unit/stress tests | **PASS** — 214/214 logic checks, 12/12 stress checks, Node 22 |
 | Full cross-platform USB build with generated WASM | **Not run yet** |
 | Real-browser F8 and WAV/MP3 export smoke test | **Not run yet** |
 
