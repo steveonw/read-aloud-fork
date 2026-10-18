@@ -1,0 +1,39 @@
+name: M2b native CosyVoice pilot contract tests
+
+on:
+  pull_request:
+    paths:
+      - "native/cosyvoice/**"
+      - ".github/workflows/m2b-native-pilot.yml"
+  push:
+    branches: [m2b/native-cosyvoice-pilot]
+    paths:
+      - "native/cosyvoice/**"
+      - ".github/workflows/m2b-native-pilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-stdlib:
+    name: Pilot CLI and mock runtime (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Python syntax
+        run: python -m py_compile native/cosyvoice/pilot.py native/cosyvoice/test_pilot.py
+      - name: Isolated no-CUDA/model contract tests
+        run: python -m unittest discover -s native/cosyvoice -p "test_*.py" -v
+      - name: Help and missing-model are safe
+        shell: bash
+        run: |
+          python native/cosyvoice/pilot.py --help
+          python native/cosyvoice/pilot.py probe --model-dir missing --cosyvoice-repo missing
