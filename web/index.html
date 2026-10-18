@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Read Aloud — Offline Proofreading</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <noscript>
+      <section class="noscript-banner" role="alert">
+        <strong>JavaScript is turned off in this browser.</strong>
+        <p>Read Aloud runs entirely on this computer — no internet is used and nothing is uploaded —
+        but the offline voice engine needs JavaScript to run.</p>
+        <p>If you use NoScript or a script blocker, allow scripts for <code>127.0.0.1</code> and
+        <code>localhost</code> only; there are no third-party scripts on this page.
+        Otherwise, enable JavaScript in your browser settings, then reload this page.</p>
+      </section>
+    </noscript>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PRIVATE · OFFLINE · PORTABLE</p>
+        <h1>Read Aloud</h1>
+        <p class="subtitle">Paste your draft, place the cursor, then press <kbd>F8</kbd> to listen from there. New here? Read the <a href="manual.html">user guide</a>.</p>
+      </div>
+      <div class="status-card" aria-live="polite">
+        <span id="statusDot" class="dot loading"></span>
+        <div>
+          <strong id="statusTitle">Loading voice…</strong>
+          <span id="statusDetail">The first launch can take several seconds.</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="editor-card">
+      <label for="draft">Your draft</label>
+      <div id="restoreBanner" class="offer-banner" hidden>
+        An autosaved session from this drive was found.
+        <button id="restoreYes" type="button">Restore</button>
+        <button id="restoreNo" class="quiet" type="button">Dismiss</button>
+      </div>
+      <div id="importBanner" class="offer-banner" hidden>
+        Replace the current draft with <strong id="importName"></strong>? Unsaved work will be lost.
+        <button id="importYes" type="button">Replace</button>
+        <button id="importNo" class="quiet" type="button">Cancel</button>
+      </div>
+      <div class="editor-stack">
+        <div id="backdrop" aria-hidden="true"><div id="backdropContent" class="backdrop-content"></div></div>
+        <textarea id="draft" spellcheck="true" autofocus placeholder="Paste text here. Press F8 to read aloud from the cursor."></textarea>
+      </div>
+      <div class="selection-row">
+        <span id="selectionInfo">F8 reads aloud from the cursor to the end. Esc stops.</span>
+        <button id="tidyButton" class="quiet" type="button" title="Straighten quotes, remove hidden characters">Tidy text</button>
+        <button id="clearButton" class="quiet" type="button">Clear</button>
+      </div>
+      <div class="lint-row" id="lintInfo" aria-live="polite"></div>
+      <div class="flags-row" id="flagsRow" hidden>
+        <span id="flagsInfo"></span>
+        <button id="flagPanelToggle" class="quiet" type="button">Show</button>
+        <button id="flagReportButton" class="quiet" type="button">Report</button>
+        <button id="flagClearButton" class="quiet" type="button">Clear flags</button>
+      </div>
+      <ol class="flag-panel" id="flagPanel" hidden></ol>
+    </section>
+
+    <section class="controls" aria-label="Read aloud controls">
+      <button id="readButton" class="primary" type="button" disabled>
+        <span aria-hidden="true">▶</span> Read
+      </button>
+      <button id="stopButton" type="button" disabled>
+        <span aria-hidden="true">■</span> Stop
+      </button>
+      <label class="speed-control" for="voiceSelect">
+        Voice
+        <select id="voiceSelect" disabled></select>
+      </label>
+      <label class="speed-control" for="speakerSelect" id="speakerRow" hidden>
+        Speaker
+        <select id="speakerSelect"></select>
+      </label>
+      <div class="speed-control" id="deliveryRow" hidden>
+        Delivery
+        <span class="seg" role="group" aria-label="Delivery style">
+          <button id="deliveryNatural" type="button" class="segbtn active">Natural</button>
+          <button id="deliverySteady" type="button" class="segbtn">Steady</button>
+        </span>
+      </div>
+      <label class="speed-control" for="speed">
+        Speed
+        <input id="speed" type="range" min="0.65" max="1.45" step="0.05" value="1">
+        <output id="speedValue" for="speed">1.00×</output>
+      </label>
+      <button id="helpButton" class="quiet help-btn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+      <details class="ctl-group" id="playbackGroup" open>
+        <summary>Playback</summary>
+        <div class="tuning-row" aria-label="Playback tuning">
+          <label for="volume">
+            Volume
+            <input id="volume" type="range" min="0" max="1" step="0.05" value="1">
+            <output id="volumeValue" for="volume">100%</output>
+          </label>
+          <label for="gap">
+            Pause
+            <input id="gap" type="range" min="0" max="1.5" step="0.05" value="0.35">
+            <output id="gapValue" for="gap">0.35s</output>
+          </label>
+          <label for="pitch">
+            Pitch
+            <input id="pitch" type="range" min="0.85" max="1.15" step="0.01" value="1">
+            <output id="pitchValue" for="pitch">0%</output>
+          </label>
+          <label class="toggle" for="stepToggle">
+            <input id="stepToggle" type="checkbox">
+            Step
+          </label>
+          <label class="toggle" for="focusToggle">
+            <input id="focusToggle" type="checkbox">
+            Focus
+          </label>
+          <label class="toggle" for="resumeToggle" title="Leave a ▸ marker on the sentence where reading stopped">
+            <input id="resumeToggle" type="checkbox" checked>
+            Resume marker
+          </label>
+        </div>
+      </details>
+      <details class="ctl-group" id="displayGroup" open>
+        <summary>Display</summary>
+        <div class="tuning-row" aria-label="Display settings">
+          <label for="fontScale">
+            Text size
+            <input id="fontScale" type="range" min="0.8" max="1.6" step="0.05" value="1">
+            <output id="fontValue" for="fontScale">100%</output>
+          </label>
+          <label for="lineSpacing">
+            Spacing
+            <input id="lineSpacing" type="range" min="1.3" max="2.4" step="0.05" value="1.7">
+            <output id="spacingValue" for="lineSpacing">1.70</output>
+          </label>
+          <label for="fontSelect">
+            Font
+            <select id="fontSelect">
+              <option value="serif" selected>Serif</option>
+              <option value="hyper">Hyperlegible</option>
+            </select>
+          </label>
+          <label for="themeSelect">
+            Theme
+            <select id="themeSelect">
+              <option value="auto" selected>Auto</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+          <label class="toggle" for="cleanPasteToggle">
+            <input id="cleanPasteToggle" type="checkbox" checked>
+            Clean pasted text
+          </label>
+        </div>
+      </details>
+    </section>
+
+    <section class="narration" aria-label="Narration and WAV export">
+      <div class="narration-text">
+        <strong>Narration</strong>
+        <span id="narrationInfo">Paste text, render it once, then export a WAV. Edits only re-render changed sentences.</span>
+        <span id="statsInfo" class="stats-line"></span>
+      </div>
+      <div class="narration-buttons">
+        <button id="renderButton" type="button" disabled>
+          <span aria-hidden="true">⟳</span> Render / Update
+        </button>
+        <button id="exportButton" type="button" disabled>
+          <span aria-hidden="true">⤓</span> Export WAV
+        </button>
+        <button id="exportMp3Button" type="button" disabled>
+          <span aria-hidden="true">⤓</span> Export MP3
+        </button>
+        <label class="labels-toggle" for="labelsToggle">
+          <input id="labelsToggle" type="checkbox">
+          Audacity labels
+        </label>
+        <button id="copyAllButton" class="quiet" type="button">Copy all text</button>
+        <button id="saveTxtButton" class="quiet" type="button">Save draft as .txt</button>
+      </div>
+    </section>
+
+    <details class="help settings-panel">
+      <summary>Settings, pronunciation &amp; sessions</summary>
+      <div class="settings-body">
+        <p>Copy your settings as one line of text, or save them as <strong>settings.txt</strong> next to
+        the app files in the <strong>shared</strong> folder — the page loads that file automatically on
+        every launch, on any computer. Pronunciation fixes live in the <code>dict</code> part, for example
+        <code>"dict":{"Dr.":"Doctor","kubectl":"kube control"}</code>; they change only how words are
+        spoken, never your text. A session file saves the draft, flags, and settings together.</p>
+        <textarea id="settingsBox" rows="3" spellcheck="false" placeholder='RA1 {"v":1,"speed":1, ... }'></textarea>
+        <div class="settings-buttons">
+          <button id="settingsShow" class="quiet" type="button">Show current</button>
+          <button id="settingsApply" class="quiet" type="button">Apply</button>
+          <button id="settingsCopy" class="quiet" type="button">Copy</button>
+          <button id="settingsDownload" class="quiet" type="button">Save settings.txt to drive</button>
+          <button id="sessionSave" class="quiet" type="button">Save session to drive</button>
+          <button id="sessionOpen" class="quiet" type="button">Open session</button>
+          <label class="toggle" for="autosaveToggle">
+            <input id="autosaveToggle" type="checkbox">
+            Autosave to drive
+          </label>
+          <span id="autosaveDot" class="autosave-dot" hidden>● autosaving to this drive</span>
+          <input type="file" id="sessionFile" accept=".json,.txt,application/json" hidden>
+        </div>
+      </div>
+    </details>
+
+    <section class="privacy-note">
+      <strong>No internet is used.</strong>
+      Text stays in this browser tab. Rendered audio is kept in this tab's memory for replay and export; nothing is uploaded, and an audio file is written only when you choose Export.
+      <span class="quit-line"><button id="quitButton" class="quiet" type="button">Shut down Read Aloud</button></span>
+    </section>
+
+    <details class="help">
+      <summary>Keyboard and troubleshooting</summary>
+      <p><strong>New to Read Aloud?</strong> The <a href="manual.html">user guide</a> walks through everything on one friendly page — it also lives on the drive as <strong>HOW TO USE.html</strong>.</p>
+      <p><kbd>F8</kbd> reads aloud from the cursor to the end of the draft, highlighting each sentence as it is spoken. The next sentence is prepared while the current one plays, so reading is continuous. With text selected, <kbd>F8</kbd> reads only the selection. <kbd>Esc</kbd> stops and leaves a <strong>▸ resume marker</strong> on the sentence — it follows the sentence through edits and clears itself once you read it again. Pressing <kbd>F8</kbd> resumes from the stopped sentence. Editing the text stops playback. Press <kbd>?</kbd> anytime for the shortcut overlay.</p>
+      <p><strong>Adding voices:</strong> copy a compatible voice package folder into the
+      <strong>voices</strong> folder next to <strong>shared</strong> on this drive, then relaunch.
+      Three families work: <strong>Piper VITS</strong> packages hold <code>voice.json</code>,
+      <code>model.onnx</code> and <code>tokens.txt</code>; <strong>KittenTTS</strong> and
+      <strong>Kokoro</strong> packages also include their matching <code>voices.bin</code> and carry
+      several speakers in one file. Multi-speaker Piper models (such as LibriTTS-R with 904 speakers)
+      work too — the Speaker dropdown appears automatically, and a curated <code>speakers</code> list
+      in <code>voice.json</code> (schemaVersion 2) gives your favorites proper names.
+      It will appear in the Voice dropdown automatically. The <a href="make-voice.html">voice package maker</a> can build and test compatible Piper, KittenTTS, and Kokoro packages. Invalid packages are skipped and reported
+      without affecting working voices.</p>
+      <p><kbd>F7</kbd> replays the current sentence (or, while stopped, reads the sentence at the cursor once).
+      <kbd>F9</kbd> flags the current sentence for later without interrupting playback; <kbd>F10</kbd> jumps
+      to the next flagged sentence. <strong>Show</strong> opens the flag panel: click any entry to jump to it,
+      and flags follow their sentences through edits and moves — a rewritten sentence keeps its flag, and a
+      deleted one is listed as not found. Flagged sentences carry a dotted underline in the text. <strong>Step</strong> waits after each sentence — press <kbd>F8</kbd>
+      (or Space outside the text box) for the next one. <strong>Focus</strong> dims everything except the
+      sentence being spoken.</p>
+      <p><strong>Render / Update</strong> synthesizes every sentence of the draft into memory, and <strong>Export WAV</strong> stitches them into one audio file with natural pauses. After editing, Render / Update re-records only the sentences that changed; everything else is reused instantly. Changing the speed re-renders everything, since it produces different audio.</p>
+      <p>Do not open <code>shared/index.html</code> directly. Close this page and use the matching <code>START</code> launcher in the parent folder. Keep the <code>shared</code> folder beside the launcher.</p>
+    </details>
+    <div id="helpOverlay" class="help-overlay" hidden role="dialog" aria-label="Keyboard shortcuts">
+      <div class="help-card">
+        <strong>Keyboard shortcuts</strong>
+        <dl>
+          <dt><kbd>F8</kbd></dt><dd>Read from the cursor (or read the selection). In step mode: next sentence.</dd>
+          <dt><kbd>F7</kbd></dt><dd>Replay the current sentence.</dd>
+          <dt><kbd>F9</kbd></dt><dd>Flag the current sentence while listening.</dd>
+          <dt><kbd>F10</kbd></dt><dd>Jump to the next flagged sentence.</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Stop reading (a ▸ resume marker is left on the sentence).</dd>
+          <dt><kbd>Space</kbd></dt><dd>Next sentence in step mode, when the text box is not focused.</dd>
+          <dt><kbd>?</kbd></dt><dd>Show or hide this overlay.</dd>
+        </dl>
+        <button id="helpClose" class="quiet" type="button">Close</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
