@@ -98,6 +98,18 @@ tail -n 35 ../cosyvoice-pilot-debug.log
 
 The JSON output includes the exception type and the first 600 characters of its message; `--debug` additionally records **stage markers and a real Python traceback** in a local text file. These diagnostics may contain local user paths; remove personal paths, tokens or reference filenames before pasting elsewhere. No audio, script text or traceback is uploaded automatically. **Do not repeatedly retry GPU inference** after a failure. Inspect the real reason first and decide whether the fix is a missing Windows runtime dependency, CUDA issue or actual GPU memory pressure.
 
+## Audio integrity check: first Windows WAV was **not** speech
+
+The first real GTX 1650 render returned `status: success` and saved a 24 kHz, 1.36-second WAV, but user-provided audio inspection found **32,640 identical mono samples at -1.0** (every PCM16 sample was `-32768`). That is a flat-line, saturated waveform, **not narration**. The initial pilot treated "received PCM of sufficient length" as success; the log did not check numeric validity of samples.
+
+Current M2b pilot now checks the **raw floating-point samples before SoundFile's PCM16 conversion** and rejects:
+- NaN or infinite samples (`generated_audio_nonfinite`)
+- silence, constant waveforms, or excessive full-scale clipping (`generated_audio_silent`, `generated_audio_constant`, `generated_audio_clipped`)
+
+An invalid waveform exits nonzero, returns structured `audio_diagnostics` (sample count, min/max, peak, RMS, clipping and non-finite counts), and **does not publish a WAV**. Validation helps identify the symptoms but **does not establish** whether the failure originated from fp16 numerical issues, GPU oversubscription, a missing CPU/GPU ONNX provider, frontend normalization, or elsewhere. The logs previously noted no CUDA ONNX ExecutionProvider and an optional WeText/ModelScope 403; those are leads, not a proven cause.
+
+Do not interpret `status: success` from pilot versions before this fix as usable speech. Since the initial `--fp16` full-model attempt consumed or oversubscribed the card's 4 GiB VRAM and produced invalid audio, **avoid repeated GPU attempts or switching to fp32 on the same device without separate capacity planning**. Preserve existing WAVs for debugging; the updated pilot won't overwrite them unless `--overwrite` is specified.
+
 ## Record the result
 
 A successful WAV result prints `sample_rate`, `sample_count`, `load_seconds`, `render_seconds`, `torch`, and CUDA peak allocated/reserved bytes when available. Paste the JSON with sensitive file paths removed into [M2 issue #4](https://github.com/steveonw/read-aloud-fork/issues/4) or a PR comment. If the actual GPU test fails, record the reason code and package/driver versions; the failure is useful for determining whether CPU offloading or a remote server should be preferred.
