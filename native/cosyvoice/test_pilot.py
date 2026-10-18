@@ -3,7 +3,7 @@
 No torch, CUDA, model weights, network, or actual speaker/reference audio needed.
 """
 import argparse
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, redirect_stderr
 import io
 import json
 import pathlib
@@ -222,6 +222,65 @@ class PilotTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 pilot.render(self.args())
         self.assertFalse(self.output.exists())
+
+    def test_render_runtime_error_explains_the_cause_without_dumping_a_traceback(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        cmd = [
+            "render", "--model-dir", str(self.model),
+            "--cosyvoice-repo", str(self.repo),
+            "--text", "The storm was coming.",
+            "--reference-wav", str(self.wav),
+            "--output-wav", str(self.output),
+            "--direction", "Documentary voice",
+            "--try-anyway",
+        ]
+        with mock.patch.object(pilot, "render", side_effect=RuntimeError("missing platform operator")), \
+             redirect_stdout(stdout), redirect_stderr(stderr):
+            code = pilot.main(cmd)
+        info = json.loads(stdout.getvalue())
+        self.assertEqual(code, 2)
+        self.assertEqual(info["reason"], "RuntimeError")
+        self.assertEqual(info["error_message"], "missing platform operator")
+        self.assertEqual(info["exception_type"], "RuntimeError")
+        self.assertNotIn("Traceback", stderr.getvalue())
+        self.assertFalse(self.output.exists())
+
+    def test_debug_opt_in_shows_the_actual_native_exception_stack(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        cmd = [
+            "render", "--model-dir", str(self.model),
+            "--cosyvoice-repo", str(self.repo),
+            "--text", "The storm was coming.",
+            "--reference-wav", str(self.wav),
+            "--output-wav", str(self.output),
+            "--direction", "Documentary voice",
+            "--try-anyway", "--debug",
+        ]
+        with mock.patch.object(pilot, "render", side_effect=RuntimeError("failed during model load")), \
+             redirect_stdout(stdout), redirect_stderr(stderr):
+            code = pilot.main(cmd)
+        info = json.loads(stdout.getvalue())
+        self.assertEqual(code, 2)
+        self.assertEqual(info["error_message"], "failed during model load")
+        self.assertIn("RuntimeError: failed during model load", stderr.getvalue())
+        self.assertIn("Traceback", stderr.getvalue())
+
+    def test_cuda_oom_stays_distinct_from_other_runtime_failures(self):
+        stdout = io.StringIO()
+        cmd = [
+            "render", "--model-dir", str(self.model),
+            "--cosyvoice-repo", str(self.repo),
+            "--text", "The storm was coming.",
+            "--reference-wav", str(self.wav),
+            "--output-wav", str(self.output),
+            "--direction", "Documentary voice",
+            "--try-anyway",
+        ]
+        with mock.patch.object(pilot, "render", side_effect=RuntimeError("CUDA out of memory")), \
+             redirect_stdout(stdout):
+            code = pilot.main(cmd)
+        self.assertEqual(code, 2)
+        self.assertEqual(json.loads(stdout.getvalue())["reason"], "cuda_out_of_memory")
 
     def test_cli_errors_are_structured_and_never_synthesize(self):
         output = io.StringIO()
