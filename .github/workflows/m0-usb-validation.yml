@@ -1,11 +1,13 @@
-name: M0 full USB and real-browser validation
+name: Portable USB and real-browser validation
 
-# Run exactly on this M0 workflow introduction; expensive build is opt-in for reruns.
+# Reusable full USB/Chromium validation. Normally opt-in on the stable branch.
 on:
   push:
-    branches: [m0/import-read-aloud-baseline]
+    branches: [m0/import-read-aloud-baseline, m1/tts-provider-adapter]
     paths:
       - ".github/workflows/m0-usb-validation.yml"
+      - "web/**"
+      - "scripts/**"
   workflow_dispatch:
 
 concurrency:

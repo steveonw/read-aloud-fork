@@ -1,9 +1,9 @@
-name: M0 baseline regression
+name: Read-Aloud core regression
 
 on:
   pull_request:
   push:
-    branches: [m0/import-read-aloud-baseline]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -32,6 +32,7 @@ jobs:
       - name: JavaScript baseline and stress checks
         run: |
           npm install --no-save jsdom@29.1.1
+          node scripts/tts_backend_tests.js .
           node scripts/web_tests.js . 17391
           node scripts/stress_tests.js .
       - name: Shell syntax

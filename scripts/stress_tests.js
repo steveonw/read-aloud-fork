@@ -11,6 +11,7 @@ const fs = require('fs');
 const dir = process.argv[2] || '.';
 const html = fs.readFileSync(`${dir}/web/index.html`, 'utf8');
 const appjs = fs.readFileSync(`${dir}/web/app.js`, 'utf8');
+const backendjs = fs.readFileSync(`${dir}/web/tts-backends.js`, 'utf8');
 const tick = () => new Promise((r) => setTimeout(r, 0));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
@@ -51,6 +52,7 @@ function makeWorld() {
     }
     return Promise.resolve({ok: true, json: () => Promise.resolve({}), text: () => Promise.resolve('x')});
   };
+  w.eval(backendjs);
   w.eval(appjs);
   world.$ = (id) => w.document.getElementById(id);
   world.key = (k) => w.document.dispatchEvent(new w.KeyboardEvent('keydown', {key: k}));
