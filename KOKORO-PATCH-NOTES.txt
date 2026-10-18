@@ -1,0 +1,54 @@
+Read-Aloud-Main with Kokoro support
+===================================
+
+This is a COMPLETE copy of the repository at commit
+335045b66116300a39a5cc71a7fc8f4a741496e3, with Kokoro added as a
+third voice family. Paste it over your working folder, or upload the
+whole thing to GitHub.
+
+FILES CHANGED (nine, everything else is untouched upstream):
+  cmd/launcher/voices.go              accept sherpa-kokoro / kokoro
+  cmd/launcher/voices_test.go         kokoro validation tests
+  cmd/launcher/main_test.go           NEW file
+  web/sherpa-onnx-tts.worker.js       kokoroConfig() + third arch branch
+  web/make-voice.js                   build + audition kokoro packages
+  web/make-voice.html                 wording
+  web/index.html                      wording
+  README.md                           wording
+  SPEC-1.1.md                         wording
+
+NOTE ON THE "launcher" BINARY
+  The launcher file here is UPSTREAM'S OWN committed binary, byte for
+  byte. It is NOT the rebuilt one that came in the zip you were sent.
+  It is stale either way -- rebuild it yourself before use.
+
+VERIFIED ON THIS EXACT TREE
+  go vet ./...                 clean
+  go test ./cmd/...            ok
+  node scripts/web_tests.js    214/214
+  node scripts/stress_tests.js 12/12
+  Real kokoro-en-v0_19 package accepted by the patched validator.
+
+NOT VERIFIED
+  Nothing past the WASM boundary. kokoroConfig() has never run against
+  a real engine. See the bring-up checklist.
+
+WHAT TO DO NEXT
+  1. Paste this over your folder / upload to a new branch.
+  2. The WASM engine does NOT need rebuilding -- Kokoro is already
+     compiled into sherpa-onnx v1.13.4. scripts/ is untouched.
+     Either run "Build Read Aloud USB" in Actions, or if you already
+     have dist/ReadAloudUSB, copy the four changed web/ files into
+     shared/ and run ./scripts/build_launchers.sh (Go only).
+  3. Download kokoro-en-v0_19.tar.bz2 from the sherpa-onnx
+     "tts-models" release. Put model.onnx, tokens.txt and voices.bin
+     into voices/kokoro-en-v0-19/ on the drive, together with the
+     separate voice.json. Do not copy the archive's espeak-ng-data,
+     README.md or LICENSE -- espeak is already baked into the engine
+     and is byte-identical to the copy Kokoro ships.
+  4. First load pulls a 330 MB model. A long pause is expected. The
+     one real risk is an out-of-memory abort; if that happens, try
+     Module.FS.unlink('/model.onnx') right after createOfflineTts().
+  5. Confirm the ready message reports 11 speakers, then switch a US
+     voice for a UK one and check they actually sound different.
+     That last check is the one that catches a silent sid failure.
