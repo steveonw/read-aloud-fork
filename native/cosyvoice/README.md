@@ -74,6 +74,30 @@ This calls official `inference_instruct2`. Whether the direction changes the emo
 
 If the GPU repeatedly runs out of memory, you may test `--device cpu --try-anyway` in a fresh process, but CPU generation may be extremely slow and 20 GB RAM does not guarantee success. Do not install unverified quantized builds or modify CUDA libraries until we know the actual failure mode.
 
+## Diagnosing a generic RuntimeError on Windows
+
+Early pilot versions returned only `"reason": "RuntimeError"`. This can come from a native DLL/runtime issue, a model-loading failure, or an inference error; **it is not enough to infer CUDA out of memory**. A user with Windows 10 / GTX 1650 first reported this exact result after ~3 seconds.
+
+After updating your M2b pilot checkout with `git pull --ff-only`, pass `--debug` to a **single** run:
+
+~~~bash
+cd ~/cosyvoice-pilot/ReadAloudForkPilot
+git pull --ff-only
+cd ../CosyVoice
+python ../ReadAloudForkPilot/native/cosyvoice/pilot.py render \
+  --cosyvoice-repo . \
+  --model-dir pretrained_models/Fun-CosyVoice3-0.5B \
+  --device cuda \
+  --text "The storm was coming." \
+  --reference-wav asset/zero_shot_prompt.wav \
+  --direction "Speak like a calm documentary narrator." \
+  --output-wav ../cosyvoice-first-test.wav \
+  --fp16 --try-anyway --debug 2> ../cosyvoice-pilot-debug.log
+tail -n 35 ../cosyvoice-pilot-debug.log
+~~~
+
+The JSON output includes the exception type and the first 600 characters of its message; `--debug` additionally records **stage markers and a real Python traceback** in a local text file. These diagnostics may contain local user paths; remove personal paths, tokens or reference filenames before pasting elsewhere. No audio, script text or traceback is uploaded automatically. **Do not repeatedly retry GPU inference** after a failure. Inspect the real reason first and decide whether the fix is a missing Windows runtime dependency, CUDA issue or actual GPU memory pressure.
+
 ## Record the result
 
 A successful WAV result prints `sample_rate`, `sample_count`, `load_seconds`, `render_seconds`, `torch`, and CUDA peak allocated/reserved bytes when available. Paste the JSON with sensitive file paths removed into [M2 issue #4](https://github.com/steveonw/read-aloud-fork/issues/4) or a PR comment. If the actual GPU test fails, record the reason code and package/driver versions; the failure is useful for determining whether CPU offloading or a remote server should be preferred.
