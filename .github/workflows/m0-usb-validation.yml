@@ -3,11 +3,12 @@ name: Portable USB and real-browser validation
 # Reusable full USB/Chromium validation. Normally opt-in on the stable branch.
 on:
   push:
-    branches: [m0/import-read-aloud-baseline, m1/tts-provider-adapter]
+    branches: [m1/tts-provider-adapter, m2/windows-gpu-preflight]
     paths:
       - ".github/workflows/m0-usb-validation.yml"
       - "web/**"
       - "scripts/**"
+      - "cmd/**"
   workflow_dispatch:
 
 concurrency:
