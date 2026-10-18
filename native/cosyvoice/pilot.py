@@ -216,8 +216,11 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     if args.device == "cuda" and not torch.cuda.is_available():
         raise ValueError("cuda_not_available")
     using_cuda = bool(torch.cuda.is_available())
-    if using_cuda:
-        torch.cuda.reset_peak_memory_stats(0)
+    # This pilot runs exactly one render in a fresh Python process, so CUDA
+    # peak counters start clean; no manual reset is necessary. In PyTorch
+    # 2.3.1+cu121 on the Windows GTX 1650, reset_peak_memory_stats(0) raised
+    # "RuntimeError: Invalid device argument" before CosyVoice ever loaded.
+    # We still collect per-process peak allocated/reserved bytes after render.
     starting = torch_information(torch)
     started_at = time.monotonic()
     diagnostic_stage(args, "importing official CosyVoice AutoModel")
