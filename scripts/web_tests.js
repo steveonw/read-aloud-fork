@@ -4,6 +4,7 @@ const dir = process.argv[2];
 const port = process.argv[3];
 const html = fs.readFileSync(`${dir}/web/index.html`, 'utf8');
 const appjs = fs.readFileSync(`${dir}/web/app.js`, 'utf8');
+const backendjs = fs.readFileSync(`${dir}/web/tts-backends.js`, 'utf8');
 
 // ---- segmenter unit suite ----
 const begin = appjs.indexOf('const ABBREVIATIONS');
@@ -110,6 +111,7 @@ function makeWorld(preSeed) {
   };
   w.URL.revokeObjectURL = () => {};
   if (preSeed) preSeed(world);
+  w.eval(backendjs);
   w.eval(appjs);
   return (async () => {
     for (let i = 0; i < 50 && !world.workerInstance; i++) await new Promise((r) => setTimeout(r, 5));
