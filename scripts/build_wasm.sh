@@ -144,6 +144,7 @@ cp -R "$GENERATED"/. "$OUTPUT_DIR"/
 cp "$PROJECT_ROOT/web/index.html" "$OUTPUT_DIR/index.html"
 cp "$PROJECT_ROOT/web/app.js" "$OUTPUT_DIR/app.js"
 cp "$PROJECT_ROOT/web/tts-backends.js" "$OUTPUT_DIR/tts-backends.js"
+cp "$PROJECT_ROOT/web/tts-diagnostics.js" "$OUTPUT_DIR/tts-diagnostics.js"
 cp "$PROJECT_ROOT/web/style.css" "$OUTPUT_DIR/style.css"
 cp "$PROJECT_ROOT/web/mp3-worker.js" "$OUTPUT_DIR/mp3-worker.js"
 cp "$PROJECT_ROOT/web/sherpa-onnx-tts.worker.js" "$OUTPUT_DIR/sherpa-onnx-tts.worker.js"
