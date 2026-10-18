@@ -151,6 +151,9 @@ func main() {
 		voiceFS.ServeHTTP(w, r)
 	})
 
+	// Read-only local diagnostics; does not launch or load a native TTS model.
+	mux.HandleFunc("/api/tts/capabilities", ttsCapabilitiesHandler)
+
 	mux.HandleFunc("/api/voices", func(w http.ResponseWriter, r *http.Request) {
 		if !validHost(r.Host) {
 			http.Error(w, "invalid host", http.StatusForbidden)
