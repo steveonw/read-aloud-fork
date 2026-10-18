@@ -159,6 +159,13 @@
           </label>
         </div>
       </details>
+      <details class="ctl-group" id="gpuGroup">
+        <summary>CosyVoice hardware check (optional)</summary>
+        <div class="tuning-row">
+          <button id="gpuProbeButton" class="quiet" type="button">Check local GPU</button>
+          <span id="gpuProbeStatus" role="status" aria-live="polite">Not checked. Portable voices work without a GPU.</span>
+        </div>
+      </details>
     </section>
 
     <section class="narration" aria-label="Narration and WAV export">
@@ -261,5 +268,6 @@
 
   <script src="tts-backends.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="tts-diagnostics.js" defer></script>
 </body>
 </html>
