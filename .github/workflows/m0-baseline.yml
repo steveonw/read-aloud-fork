@@ -29,10 +29,12 @@ jobs:
           go test ./cmd/...
           go vet ./...
           go build -o "$RUNNER_TEMP/readaloud-launcher" ./cmd/launcher
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o "$RUNNER_TEMP/readaloud-windows.exe" ./cmd/launcher
       - name: JavaScript baseline and stress checks
         run: |
           npm install --no-save jsdom@29.1.1
           node scripts/tts_backend_tests.js .
+          node scripts/tts_diagnostics_tests.js .
           node scripts/web_tests.js . 17391
           node scripts/stress_tests.js .
       - name: Shell syntax
