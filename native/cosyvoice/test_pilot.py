@@ -48,6 +48,7 @@ class FakeCuda:
 
     def reset_peak_memory_stats(self, _):
         self.reset_called = True
+        raise RuntimeError("Invalid device argument")
 
     def get_device_name(self, _):
         return "Mock GTX 1650"
@@ -190,7 +191,9 @@ class PilotTests(unittest.TestCase):
             result = pilot.render(self.args(fp16=True))
         self.assertEqual(model.mode, "zero_shot")
         self.assertIn("<|endofprompt|>The exact words", model.context)
-        self.assertTrue(gpu.reset_called)
+        # On the user's Windows CUDA runtime this reset fails before model load.
+        # Each pilot render is a new process, so skip the reset entirely.
+        self.assertFalse(gpu.reset_called)
         self.assertEqual(result["mode"], "zero_shot")
         self.assertEqual(result["device"], "cuda")
         self.assertTrue(result["fp16"])
