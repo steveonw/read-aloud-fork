@@ -15,6 +15,7 @@ import platform
 import sys
 import tempfile
 import time
+import traceback
 from typing import Any
 
 MODEL_ID = "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
@@ -186,7 +187,14 @@ def memory_snapshot(torch: Any) -> dict[str, int]:
     return gpu
 
 
+def diagnostic_stage(args: argparse.Namespace, message: str) -> None:
+    """Show safe progress markers only when the user explicitly requests diagnostics."""
+    if getattr(args, "debug", False):
+        print("[cosyvoice-pilot] " + message, file=sys.stderr, flush=True)
+
+
 def render(args: argparse.Namespace) -> dict[str, Any]:
+    diagnostic_stage(args, "validating local model, output and reference WAV")
     text, reference_wav, dest = verify_render_args(args)
     model_dir = Path(args.model_dir).expanduser().resolve()
     repo_dir = Path(args.cosyvoice_repo).expanduser().resolve()
@@ -201,6 +209,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     if args.device == "cpu":
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
+    diagnostic_stage(args, "importing Torch and SoundFile")
     import torch
     import soundfile as sf
 
@@ -211,12 +220,15 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         torch.cuda.reset_peak_memory_stats(0)
     starting = torch_information(torch)
     started_at = time.monotonic()
+    diagnostic_stage(args, "importing official CosyVoice AutoModel")
     AutoModel = import_official_model(repo_dir)
 
     # The entire model (LLM + flow + vocoder + frontend) loads here.
     # Only explicit fp16 is used; no unverified/off-label quantization.
+    diagnostic_stage(args, "loading complete CosyVoice3 model (GPU allocation may fail)")
     model = AutoModel(model_dir=str(model_dir), fp16=bool(args.fp16 and using_cuda))
     loaded_seconds = time.monotonic() - started_at
+    diagnostic_stage(args, "model loaded; starting speech inference")
     inference_start = time.monotonic()
     if args.direction:
         audio_parts = model.inference_instruct2(
@@ -229,6 +241,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
             stream=False, speed=args.speed)
         mode = "zero_shot"
 
+    diagnostic_stage(args, "iterating over generated PCM chunks")
     chunks = []
     for part in audio_parts:
         wave = part.get("tts_speech")
@@ -244,6 +257,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     if sample_rate < 8000 or sample_rate > 192000:
         raise RuntimeError("upstream_invalid_sample_rate")
 
+    diagnostic_stage(args, "writing result to a temporary WAV then publishing atomically")
     # Atomic publish; failed or OOM calls never overwrite an accepted take.
     dest.parent.mkdir(parents=True, exist_ok=True)
     fd, partial_name = tempfile.mkstemp(prefix=".cosyvoice-pilot-", suffix=".wav", dir=dest.parent)
@@ -295,6 +309,8 @@ def build_parser() -> argparse.ArgumentParser:
     render_cmd.add_argument("--fp16", action="store_true", help="Try upstream fp16, not guaranteed to fit 4GB")
     render_cmd.add_argument("--try-anyway", action="store_true", help="Acknowledge unknown model memory peak")
     render_cmd.add_argument("--overwrite", action="store_true", help="Replace output if already present")
+    render_cmd.add_argument("--debug", action="store_true",
+                            help="Print stages and full traceback to stderr; local file paths may appear")
     return parser
 
 
@@ -310,16 +326,24 @@ def main(argv: list[str] | None = None) -> int:
             info = render(args)
             code = 0
     except Exception as exc:
-        reason = str(exc)[:300] if isinstance(exc, ValueError) else type(exc).__name__
-        if "out of memory" in str(exc).lower() or "OutOfMemory" in type(exc).__name__:
+        error_message = str(exc).strip()
+        reason = error_message[:300] if isinstance(exc, ValueError) else type(exc).__name__
+        if "out of memory" in error_message.lower() or "OutOfMemory" in type(exc).__name__:
             reason = "cuda_out_of_memory"
         info = {
             "schema": "readaloud-studio/cosyvoice-pilot@0.1",
             "phase": args.command,
             "status": "error",
             "reason": reason,
+            "exception_type": type(exc).__name__,
             "seconds_elapsed": round(time.monotonic() - start, 3),
         }
+        if error_message:
+            info["error_message"] = error_message[:600]
+        if getattr(args, "debug", False):
+            # Only explicit local diagnostics print a stack trace, because a
+            # traceback can include model/reference paths or text snippets.
+            traceback.print_exc(file=sys.stderr)
         code = 2
     print(json.dumps(info, ensure_ascii=False, sort_keys=True), flush=True)
     return code
