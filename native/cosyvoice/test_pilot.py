@@ -155,8 +155,8 @@ class PilotTests(unittest.TestCase):
     def test_render_validation_prevents_overwriting_other_take(self):
         text, ref, out = pilot.verify_render_args(self.args())
         self.assertEqual(text, "Fourteen hours for a single frame.")
-        self.assertEqual(ref, self.wav)
-        self.assertEqual(out, self.output)
+        self.assertEqual(ref, self.wav.resolve())
+        self.assertEqual(out, self.output.resolve())
         self.output.write_bytes(b"precious old take")
         with self.assertRaisesRegex(ValueError, "output_exists"):
             pilot.verify_render_args(self.args())
