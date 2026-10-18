@@ -90,6 +90,19 @@ async function waitForHealth(base, timeoutMs) {
     check('voice engine reports ready', readyOk, 'not ready within 10 minutes');
     if (!readyOk) throw new Error('voice never became ready');
 
+    // M2a: hardware diagnostics are opt-in, read-only, and do not load CosyVoice.
+    await page.locator('#gpuGroup summary').click();
+    await page.click('#gpuProbeButton');
+    await page.waitForFunction(
+      () => document.getElementById('gpuProbeStatus').textContent.includes('Portable proofreading remains available'),
+      null, {timeout: 12000},
+    );
+    const gpuReport = await page.evaluate(() => document.getElementById('gpuProbeStatus').textContent);
+    check('optional GPU check reports native backend unavailable without breaking WASM',
+      gpuReport.includes('CosyVoice native backend not installed') &&
+      /is ready/.test(await page.evaluate(() => document.getElementById('statusTitle').textContent)),
+      gpuReport);
+
     // 2. Playback with follow-along highlight
     await page.fill('#draft', 'The quick brown fox jumps over the lazy dog. A second sentence checks the render.');
     await page.click('#draft');
