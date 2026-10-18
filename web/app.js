@@ -269,7 +269,17 @@ function startVoice(voice) {
   renderDeliveryToggle();
   ready = false;
   armLoadWatchdog();
-  worker = new Worker('sherpa-onnx-tts.worker.js', {type: 'module'});
+  // M1: use the shared worker contract; WASM remains the default provider.
+  // A missing/unsupported optional native backend must not break proofreading.
+  try {
+    worker = window.ReadAloudTTS.createVoiceWorker(voice, Worker);
+  } catch (err) {
+    worker = null;
+    clearLoadWatchdog();
+    setStatus('error', 'Speech backend unavailable', String((err && err.message) || err));
+    updateButtons();
+    return;
+  }
   worker.onmessage = handleWorkerMessage;
   worker.onerror = handleWorkerError;
   const preset = DELIVERY_PRESETS[deliveryPreset] || DELIVERY_PRESETS.natural;
