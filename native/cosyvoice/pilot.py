@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -193,6 +194,66 @@ def diagnostic_stage(args: argparse.Namespace, message: str) -> None:
         print("[cosyvoice-pilot] " + message, file=sys.stderr, flush=True)
 
 
+class InvalidGeneratedAudio(RuntimeError):
+    """The model returned samples that cannot produce a usable narration WAV."""
+
+    def __init__(self, code: str, diagnostics: dict[str, Any]):
+        self.code = code
+        self.diagnostics = diagnostics
+        super().__init__(code)
+
+
+def inspect_generated_audio(samples: Any) -> dict[str, Any]:
+    """Check actual floating point samples BEFORE converting to 16-bit WAV.
+
+    SoundFile encodes NaN as -32768 when writing PCM_16. Without this gate,
+    a model may return all NaNs or heavily clipped values and still report
+    a successful 1-second file containing no speech.
+    """
+    count = len(samples)
+    if count < 100:
+        raise InvalidGeneratedAudio("generated_audio_too_short", {"sample_count": count})
+
+    invalid = 0
+    clipped = 0
+    low, high = float("inf"), float("-inf")
+    total, power = 0.0, 0.0
+    peak = 0.0
+    for sample in samples:
+        value = float(sample)
+        if not math.isfinite(value):
+            invalid += 1
+            continue
+        low = min(low, value)
+        high = max(high, value)
+        peak = max(peak, abs(value))
+        clipped += abs(value) >= 0.999
+        total += value
+        power += value * value
+
+    finite = count - invalid
+    diagnostics: dict[str, Any] = {
+        "sample_count": count,
+        "nonfinite_count": invalid,
+        "peak_abs": round(peak, 6) if finite else None,
+        "min": round(low, 6) if finite else None,
+        "max": round(high, 6) if finite else None,
+        "clipped_fraction": round(clipped / count, 6),
+        "dc_offset": round(total / finite, 6) if finite and math.isfinite(total) else None,
+        "rms": round(math.sqrt(power / finite), 6)
+        if finite and math.isfinite(power) else None,
+    }
+    if invalid:
+        raise InvalidGeneratedAudio("generated_audio_nonfinite", diagnostics)
+    if peak < 0.0001:
+        raise InvalidGeneratedAudio("generated_audio_silent", diagnostics)
+    if high - low < 0.0001:
+        raise InvalidGeneratedAudio("generated_audio_constant", diagnostics)
+    if clipped / count >= 0.20 or peak > 2.0:
+        raise InvalidGeneratedAudio("generated_audio_clipped", diagnostics)
+    return diagnostics
+
+
 def render(args: argparse.Namespace) -> dict[str, Any]:
     diagnostic_stage(args, "validating local model, output and reference WAV")
     text, reference_wav, dest = verify_render_args(args)
@@ -254,8 +315,13 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     if not chunks:
         raise RuntimeError("upstream_returned_no_audio")
     audio = torch.cat(chunks).numpy()
-    if len(audio) < 100:
-        raise RuntimeError("upstream_returned_empty_audio")
+    diagnostic_stage(args, "validating raw waveform before PCM16 conversion")
+    try:
+        audio_diagnostics = inspect_generated_audio(audio)
+    except InvalidGeneratedAudio as exc:
+        diagnostic_stage(args, "invalid generated waveform: " + exc.code +
+                         "; " + json.dumps(exc.diagnostics, sort_keys=True))
+        raise
     sample_rate = int(model.sample_rate)
     if sample_rate < 8000 or sample_rate > 192000:
         raise RuntimeError("upstream_invalid_sample_rate")
@@ -289,6 +355,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "torch": str(torch.__version__),
         "device_before_load": starting,
         "device_after_render": memory_snapshot(torch),
+        "audio_diagnostics": audio_diagnostics,
     }
 
 
@@ -333,6 +400,8 @@ def main(argv: list[str] | None = None) -> int:
         reason = error_message[:300] if isinstance(exc, ValueError) else type(exc).__name__
         if "out of memory" in error_message.lower() or "OutOfMemory" in type(exc).__name__:
             reason = "cuda_out_of_memory"
+        elif isinstance(exc, InvalidGeneratedAudio):
+            reason = exc.code
         info = {
             "schema": "readaloud-studio/cosyvoice-pilot@0.1",
             "phase": args.command,
@@ -343,6 +412,8 @@ def main(argv: list[str] | None = None) -> int:
         }
         if error_message:
             info["error_message"] = error_message[:600]
+        if isinstance(exc, InvalidGeneratedAudio):
+            info["audio_diagnostics"] = exc.diagnostics
         if getattr(args, "debug", False):
             # Only explicit local diagnostics print a stack trace, because a
             # traceback can include model/reference paths or text snippets.
