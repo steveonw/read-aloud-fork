@@ -238,7 +238,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     if not chunks:
         raise RuntimeError("upstream_returned_no_audio")
     audio = torch.cat(chunks).numpy()
-    if audio.shape[0] < 100:
+    if len(audio) < 100:
         raise RuntimeError("upstream_returned_empty_audio")
     sample_rate = int(model.sample_rate)
     if sample_rate < 8000 or sample_rate > 192000:
@@ -264,7 +264,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         "device": "cuda" if using_cuda else "cpu",
         "fp16": bool(args.fp16 and using_cuda),
         "sample_rate": sample_rate,
-        "sample_count": int(audio.shape[0]),
+        "sample_count": int(len(audio)),
         "duration_seconds": round(len(audio) / sample_rate, 3),
         "load_seconds": round(loaded_seconds, 3),
         "render_seconds": round(time.monotonic() - inference_start, 3),
