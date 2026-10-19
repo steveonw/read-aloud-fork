@@ -165,6 +165,15 @@
           <button id="gpuProbeButton" class="quiet" type="button">Check local GPU</button>
           <span id="gpuProbeStatus" role="status" aria-live="polite">Not checked. Portable voices work without a GPU.</span>
         </div>
+        <div class="tuning-row">
+          <label class="toggle" for="cosyvoiceRights">
+            <input type="checkbox" id="cosyvoiceRights">
+            I have the rights to use the selected CosyVoice preset
+          </label>
+          <button id="cosyvoiceCheckButton" class="quiet" type="button">Find local CosyVoice GGUF</button>
+          <span id="cosyvoiceLocalStatus" role="status" aria-live="polite">Optional experimental native voice. Start the local CrispASR server first.</span>
+        </div>
+        <p class="stats-line">Early test: CrispASR prepends a spoken AI disclosure to each generated sentence. Film-ready exports will need a separate disclosure workflow.</p>
       </details>
     </section>
 
@@ -220,8 +229,8 @@
     </details>
 
     <section class="privacy-note">
-      <strong>No internet is used.</strong>
-      Text stays in this browser tab. Rendered audio is kept in this tab's memory for replay and export; nothing is uploaded, and an audio file is written only when you choose Export.
+      <strong>Portable voices work offline.</strong>
+      With the built-in browser voices, text stays in this tab and generated audio stays in memory until export. If you explicitly enable local CosyVoice GGUF, selected sentences are sent only to its separately running process at <code>127.0.0.1</code> on this computer; starting that process with <code>-m auto</code> may download missing model weights. No cloud speech server is used by this edition.
       <span class="quit-line"><button id="quitButton" class="quiet" type="button">Shut down Read Aloud</button></span>
     </section>
 
