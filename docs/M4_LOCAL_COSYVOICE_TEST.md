@@ -34,7 +34,7 @@ only known-working installation.
 3. After the M4 CI build is green, download its
    `readaloud-m4-local-bridge-windows` artifact.
 4. Extract its `START - WINDOWS.exe` and included `shared/` files into
-   **the test copy only**, allowing the four named `shared/` files to be
+   **the test copy only**, allowing the five named `shared/` files to be
    replaced. Do **not** delete the other files in `shared/`.
 5. Leave the working `~/crispasr-gguf-legacy` folder and downloaded GGUF
    models as they are. The M4 kit carries *no* model weights, CUDA libraries,
