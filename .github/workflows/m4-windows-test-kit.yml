@@ -1,0 +1,62 @@
+# M4 experimental Windows update kit.
+# This does not change the main USB release or ship any model data.
+name: M4 local CosyVoice Windows test kit
+
+on:
+  push:
+    branches:
+      - m4/local-cosyvoice-bridge
+  pull_request:
+    paths:
+      - "cmd/launcher/**"
+      - "web/app.js"
+      - "web/tts-backends.js"
+      - "web/cosyvoice-local.worker.js"
+      - "web/index.html"
+      - "scripts/cosyvoice_worker_tests.js"
+      - "docs/M4_LOCAL_COSYVOICE_TEST.md"
+      - ".github/workflows/m4-windows-test-kit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-kit:
+    name: Unit tests and isolated Windows test-kit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test Go bridge, CSRF, fixed loopback and WAV validation
+        run: go test ./cmd/...
+      - name: Test both TTS worker contracts without models
+        run: |
+          node scripts/tts_backend_tests.js .
+          node scripts/cosyvoice_worker_tests.js .
+      - name: Cross-build launcher and assemble overlay files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "build/m4-test-kit/shared"
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+            -o "build/m4-test-kit/START - WINDOWS.exe" ./cmd/launcher
+          cp web/app.js "build/m4-test-kit/shared/app.js"
+          cp web/index.html "build/m4-test-kit/shared/index.html"
+          cp web/tts-backends.js "build/m4-test-kit/shared/tts-backends.js"
+          cp web/cosyvoice-local.worker.js "build/m4-test-kit/shared/cosyvoice-local.worker.js"
+          cp docs/M4_LOCAL_COSYVOICE_TEST.md "build/m4-test-kit/TEST-INSTRUCTIONS.md"
+      - name: Upload optional overlay kit (not complete portable app)
+        uses: actions/upload-artifact@v4
+        with:
+          name: readaloud-m4-local-bridge-windows
+          path: build/m4-test-kit/
+          if-no-files-found: error
+          retention-days: 21
