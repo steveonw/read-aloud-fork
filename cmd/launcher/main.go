@@ -154,6 +154,10 @@ func main() {
 	// Read-only local diagnostics; does not launch or load a native TTS model.
 	mux.HandleFunc("/api/tts/capabilities", ttsCapabilitiesHandler)
 
+	// M4: optional native GGUF provider. All requests stay on the fixed
+	// IPv4 loopback address; the browser cannot choose a target URL.
+	mux.Handle("/api/tts/cosyvoice/", cosyVoiceLocalHandler(runToken))
+
 	mux.HandleFunc("/api/voices", func(w http.ResponseWriter, r *http.Request) {
 		if !validHost(r.Host) {
 			http.Error(w, "invalid host", http.StatusForbidden)
