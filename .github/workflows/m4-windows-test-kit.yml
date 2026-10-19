@@ -11,9 +11,11 @@ on:
       - "cmd/launcher/**"
       - "web/app.js"
       - "web/tts-backends.js"
+      - "web/tts-diagnostics.js"
       - "web/cosyvoice-local.worker.js"
       - "web/index.html"
       - "scripts/cosyvoice_worker_tests.js"
+      - "scripts/tts_diagnostics_tests.js"
       - "docs/M4_LOCAL_COSYVOICE_TEST.md"
       - ".github/workflows/m4-windows-test-kit.yml"
   workflow_dispatch:
@@ -51,6 +53,7 @@ jobs:
           cp web/app.js "build/m4-test-kit/shared/app.js"
           cp web/index.html "build/m4-test-kit/shared/index.html"
           cp web/tts-backends.js "build/m4-test-kit/shared/tts-backends.js"
+          cp web/tts-diagnostics.js "build/m4-test-kit/shared/tts-diagnostics.js"
           cp web/cosyvoice-local.worker.js "build/m4-test-kit/shared/cosyvoice-local.worker.js"
           cp docs/M4_LOCAL_COSYVOICE_TEST.md "build/m4-test-kit/TEST-INSTRUCTIONS.md"
       - name: Upload optional overlay kit (not complete portable app)
