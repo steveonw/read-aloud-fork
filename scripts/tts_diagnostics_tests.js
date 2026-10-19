@@ -15,7 +15,7 @@ const sample = {
   },
   backends: [
     {id: 'sherpa-wasm', state: 'ready', canTry: true},
-    {id: 'cosyvoice3-local', state: 'unavailable', reason: 'native_backend_not_installed', canTry: false},
+    {id: 'cosyvoice3-local', state: 'unavailable', reason: 'server_not_ready', canTry: false},
   ],
 };
 
@@ -70,7 +70,7 @@ async function check(label, fn) {
     assert.match(w.output.textContent,/GTX 1650/);
     assert.match(w.output.textContent,/4096 MiB total/);
     assert.match(w.output.textContent,/3000 MiB free/);
-    assert.match(w.output.textContent,/CosyVoice native backend not installed/);
+    assert.match(w.output.textContent,/CosyVoice local server not running/);
     assert.equal(w.called[0].path,'/api/tts/capabilities');
     assert.equal(w.called[0].opts.cache,'no-store');
     assert.equal(w.button.disabled,false);
