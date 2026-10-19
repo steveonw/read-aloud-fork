@@ -56,6 +56,9 @@ jobs:
           cp web/tts-diagnostics.js "build/m4-test-kit/shared/tts-diagnostics.js"
           cp web/cosyvoice-local.worker.js "build/m4-test-kit/shared/cosyvoice-local.worker.js"
           cp docs/M4_LOCAL_COSYVOICE_TEST.md "build/m4-test-kit/TEST-INSTRUCTIONS.md"
+          cp LICENSE "build/m4-test-kit/LICENSE"
+          mkdir -p "build/m4-test-kit/LICENSES"
+          cp LICENSES/NOTICE.txt "build/m4-test-kit/LICENSES/NOTICE.txt"
       - name: Upload optional overlay kit (not complete portable app)
         uses: actions/upload-artifact@v4
         with:
