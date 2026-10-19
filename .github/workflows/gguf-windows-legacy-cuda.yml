@@ -1,0 +1,145 @@
+# Experimental builder for Sandy Bridge Intel i5-2400 + NVIDIA GTX 1650.
+# Derived from CrispStrobe/CrispASR upstream Windows CUDA 12.6 release recipe,
+# except we deliberately disable all newer ggml CPU instructions.
+# The GitHub-hosted runner has no NVIDIA GPU; real CUDA inference is NOT tested.
+name: Build CrispASR legacy CPU + CUDA 12.6
+
+on:
+  push:
+    branches:
+      - m3/gguf-legacy-cuda
+    paths:
+      - .github/workflows/gguf-windows-legacy-cuda.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-legacy-cuda126:
+    name: Sandy Bridge CPU floor + sm75 CUDA 12.6
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      CUDA_VERSION: "12.6.3"
+    steps:
+      - name: Checkout pinned CrispASR v0.8.43 with ggml submodules
+        uses: actions/checkout@v4
+        with:
+          repository: CrispStrobe/CrispASR
+          # Annotated v0.8.43 tag peels to this exact commit.
+          ref: eb633d908120cc5f44b8af8cd4aeb1191f16bfd8
+          submodules: recursive
+          persist-credentials: false
+          path: upstream
+
+      - name: Install CUDA Toolkit 12.6.3
+        uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: "12.6.3"
+          method: network
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "nvrtc", "nvrtc_dev", "nvtx", "cuda_profiler_api", "visual_studio_integration"]'
+
+      - name: Configure and compile portable CPU plus CUDA sm75
+        shell: cmd
+        run: |
+          for /f "tokens=*" %%i in ('"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do set VSINSTALL=%%i
+          if not defined VSINSTALL exit /b 1
+          call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b 1
+          cmake -S upstream -B build -G Ninja ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DCRISPASR_PORTABLE_CPU=ON ^
+            -DGGML_NATIVE=OFF ^
+            -DGGML_CUDA=ON ^
+            -DCMAKE_CUDA_ARCHITECTURES=75-real ^
+            -DCRISPASR_OPUS_FETCH=ON
+          if errorlevel 1 exit /b 1
+          cmake --build build --target crispasr-cli --parallel 4
+          if errorlevel 1 exit /b 1
+
+      - name: Assert CPU ISA floor and CUDA configuration
+        shell: pwsh
+        run: |
+          $cache = @(Get-Content build\CMakeCache.txt)
+          $required = @{
+            CRISPASR_PORTABLE_CPU = 'ON'
+            GGML_CUDA = 'ON'
+            GGML_NATIVE = 'OFF'
+            GGML_AVX = 'OFF'
+            GGML_AVX2 = 'OFF'
+            GGML_FMA = 'OFF'
+            GGML_F16C = 'OFF'
+            GGML_BMI2 = 'OFF'
+          }
+          foreach ($key in $required.Keys) {
+            $want = "${key}:BOOL=$($required[$key])"
+            if ($cache -notcontains $want) {
+              throw "CPU/CUDA build contract not met: $want"
+            }
+            Write-Host "VERIFIED $want"
+          }
+          if (-not ($cache | Where-Object { $_ -match '^CMAKE_CUDA_ARCHITECTURES:[^=]+=(75-real|75)$' })) {
+            throw 'CUDA must target GTX 1650 sm_75 (75-real)'
+          }
+          Write-Host 'LEGACY_CPU_CUDA_CONFIG_OK'
+
+      - name: Package executable, built libraries and matching CUDA 12.6 DLLs
+        shell: pwsh
+        run: |
+          $bin = Join-Path $env:GITHUB_WORKSPACE 'build\bin'
+          $dest = Join-Path $env:GITHUB_WORKSPACE 'dist\crispasr-legacy-cpu-gtx1650-cuda126'
+          New-Item -Path $dest -ItemType Directory -Force | Out-Null
+          if (-not (Test-Path (Join-Path $bin 'crispasr.exe'))) { throw 'Missing compiled crispasr.exe' }
+          Copy-Item (Join-Path $bin 'crispasr.exe') $dest
+          $builtDlls = @(Get-ChildItem -Path $bin -Filter '*.dll' -File)
+          if ($builtDlls.Count -eq 0) { throw 'Built ggml/crispasr DLLs not found' }
+          $builtDlls | Copy-Item -Destination $dest
+          if (-not (Test-Path (Join-Path $dest 'ggml-cuda.dll'))) {
+            throw 'CUDA backend DLL was not built'
+          }
+          if (-not $env:CUDA_PATH) { throw 'CUDA_PATH was not set by toolkit installer' }
+          foreach ($dllName in @('cudart64_12.dll', 'cublas64_12.dll', 'cublasLt64_12.dll')) {
+            $found = @(Get-ChildItem -Path (Join-Path $env:CUDA_PATH 'bin') -Filter $dllName -Recurse -File)
+            if ($found.Count -ne 1) { throw "Expected one CUDA 12.6 $dllName; found $($found.Count)" }
+            Copy-Item $found[0].FullName -Destination $dest
+          }
+          Copy-Item upstream\LICENSE $dest
+          Copy-Item upstream\THIRD_PARTY_NOTICES.txt $dest
+          @'
+          EXPERIMENTAL - not a vendor release.
+          CrispASR v0.8.43 eb633d908120cc5f44b8af8cd4aeb1191f16bfd8
+          Build: CRISPASR_PORTABLE_CPU=ON, CUDA Toolkit 12.6.3, sm_75.
+          Intended for Intel i5-2400 (Sandy Bridge) and GTX 1650.
+          No speech model is bundled. No real GPU synthesis was tested in CI.
+          Keep your original installation until this produces intelligible audio.
+          '@ | Set-Content (Join-Path $dest 'README-EXPERIMENTAL.txt')
+          Write-Host "PACKAGED $dest"
+
+      - name: Run model-free Windows startup and backend checks
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:GITHUB_WORKSPACE 'dist\crispasr-legacy-cpu-gtx1650-cuda126'
+          Push-Location $dest
+          try {
+            $version = (& .\crispasr.exe --version 2>&1) | Out-String
+            Write-Host $version
+            if ($LASTEXITCODE -ne 0) { throw "crispasr.exe --version exited $LASTEXITCODE" }
+            if ($version -notmatch 'ggml backends\s*:\s*[^\r\n]*cuda') { throw 'CUDA backend missing from --version' }
+            if ($version -notmatch 'cuda toolkit\s*:\s*12\.6') { throw 'Expected CUDA Toolkit 12.6' }
+            $backends = (& .\crispasr.exe --list-backends 2>&1) | Out-String
+            if ($LASTEXITCODE -ne 0) { throw '--list-backends failed' }
+            if ($backends -notmatch 'cosyvoice3-tts-rl') { throw 'CosyVoice3 RL backend missing' }
+            Write-Host 'LEGACY_CPU_CUDA_PACKAGE_SMOKE_OK'
+          } finally {
+            Pop-Location
+          }
+
+      - name: Upload experimental standalone Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: crispasr-legacy-cpu-gtx1650-cuda126
+          path: dist/crispasr-legacy-cpu-gtx1650-cuda126/
+          if-no-files-found: error
+          retention-days: 21
+          compression-level: 0
