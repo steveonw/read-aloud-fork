@@ -49,6 +49,53 @@ type cosyVoiceSpeechRequest struct {
 	ConsentAttestation string  `json:"consentAttestation"`
 }
 
+// queryCosyVoiceHealth verifies both liveness and active TTS backend. GPU
+// presence by itself never proves model readiness.
+func queryCosyVoiceHealth(ctx context.Context, client *http.Client, upstream string) (cosyVoiceStatus, bool) {
+	status := cosyVoiceStatus{
+		State: "unavailable", Reason: "server_not_ready",
+		Message: "Start your local CrispASR CosyVoice server on 127.0.0.1:18080.",
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, upstream+"/health", nil)
+	if err != nil { return status, false }
+	res, err := client.Do(req)
+	if err != nil { return status, false }
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK { return status, false }
+	var body cosyVoiceHealth
+	if err := json.NewDecoder(io.LimitReader(res.Body, 4096)).Decode(&body); err != nil {
+		return status, false
+	}
+	if !strings.EqualFold(body.Status, "ok") || !strings.HasPrefix(strings.ToLower(body.Backend), "cosyvoice3-tts") {
+		status.Reason = "wrong_backend"
+		status.Message = "The local server is running, but it has not loaded CosyVoice 3 TTS."
+		return status, false
+	}
+	return cosyVoiceStatus{State: "ready", Reason: "local_cosyvoice_running",
+		Message: "Local CosyVoice3 GGUF is ready. Speech stays on this computer."}, true
+}
+
+func detectCosyVoiceLocal(ctx context.Context) backendCapability {
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+		Transport: &http.Transport{Proxy: nil},
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	status, ready := queryCosyVoiceHealth(ctx, client, cosyVoiceLocalURL)
+	if ready {
+		return backendCapability{
+			ID: "cosyvoice3-local", State: "ready", Reason: status.Reason, CanTry: true,
+			Message: "The local GGUF speech server responded. Actual narration quality is not yet verified.",
+		}
+	}
+	return backendCapability{
+		ID: "cosyvoice3-local", State: "unavailable", Reason: status.Reason, CanTry: false,
+		Message: status.Message,
+	}
+}
+
 func cosyVoiceLocalHandler(token string) http.Handler {
 	return newCosyVoiceLocalHandler(token, cosyVoiceLocalURL)
 }
@@ -79,31 +126,6 @@ func newCosyVoiceLocalHandler(token, upstream string) http.Handler {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 	}
-	checkHealth := func(ctx context.Context) (cosyVoiceStatus, bool) {
-		status := cosyVoiceStatus{
-			State: "unavailable", Reason: "server_not_ready",
-			Message: "Start your local CrispASR CosyVoice server on 127.0.0.1:18080.",
-		}
-		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, upstream+"/health", nil)
-		if err != nil { return status, false }
-		res, err := client.Do(req)
-		if err != nil { return status, false }
-		defer res.Body.Close()
-		if res.StatusCode != http.StatusOK { return status, false }
-		var body cosyVoiceHealth
-		if err := json.NewDecoder(io.LimitReader(res.Body, 4096)).Decode(&body); err != nil {
-			return status, false
-		}
-		if !strings.EqualFold(body.Status, "ok") || !strings.HasPrefix(strings.ToLower(body.Backend), "cosyvoice3-tts") {
-			status.Reason = "wrong_backend"
-			status.Message = "The local server is running, but it has not loaded CosyVoice 3 TTS."
-			return status, false
-		}
-		return cosyVoiceStatus{State: "ready", Reason: "local_cosyvoice_running",
-			Message: "Local CosyVoice3 GGUF is ready. Speech stays on this computer."}, true
-	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/tts/cosyvoice/status", func(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +140,7 @@ func newCosyVoiceLocalHandler(token, upstream string) http.Handler {
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		status, _ := checkHealth(r.Context())
+		status, _ := queryCosyVoiceHealth(r.Context(), client, upstream)
 		_ = json.NewEncoder(w).Encode(status)
 	})
 	mux.HandleFunc("/api/tts/cosyvoice/speech", func(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +193,7 @@ func newCosyVoiceLocalHandler(token, upstream string) http.Handler {
 			jsonError(w, http.StatusBadRequest, "Invalid speech speed")
 			return
 		}
-		if status, ok := checkHealth(r.Context()); !ok {
+		if status, ok := queryCosyVoiceHealth(r.Context(), client, upstream); !ok {
 			jsonError(w, http.StatusServiceUnavailable, status.Message)
 			return
 		}
