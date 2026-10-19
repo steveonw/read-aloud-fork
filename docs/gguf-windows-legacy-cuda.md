@@ -38,8 +38,16 @@ Do **not** overwrite `C:\Users\steveon\crispasr-gguf\`, delete the previous Pyth
    ./crispasr.exe --version
    ```
 
-3. Confirm it exits without an ISA warning and says `ggml backends: cpu,cuda`; the user should share the exact output before attempting GPU speech. Do not bypass the guard with `CRISPASR_IGNORE_CPU_ISA=1`.
-4. **Only after compatibility is confirmed**, an opt-in first speech test could be:
+3. Confirm `--version` identifies the new build with CPU and CUDA. **Important:** CrispASR exits early for `--version` and `--list-backends`, *before* its real CPU-ISA startup check (the original incompatible package also passed `--version`). For a model-free check that reaches the guard, run:
+
+   ```bash
+   ./crispasr.exe --backend cosyvoice3-tts-rl -m ./THIS_FILE_DOES_NOT_EXIST.gguf \
+     --voice fleurs-en --i-have-rights \
+     --tts "Test." --tts-output ./not-created.wav
+   ```
+
+   A **missing model** error is expected and means startup got past the CPU check; an **AVX2/FMA/F16C/BMI2** error means compatibility is not solved. Do not bypass the guard with `CRISPASR_IGNORE_CPU_ISA=1`, and do not interpret this probe as actual model inference success.
+4. **Only after the real startup check passes**, an opt-in first speech test could be:
 
    ```bash
    ./crispasr.exe --backend cosyvoice3-tts-rl -m auto \
