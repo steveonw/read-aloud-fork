@@ -41,6 +41,9 @@ const sessionOpen = document.getElementById('sessionOpen');
 const sessionFile = document.getElementById('sessionFile');
 const quitButton = document.getElementById('quitButton');
 const voiceSelect = document.getElementById('voiceSelect');
+const cosyvoiceRights = document.getElementById('cosyvoiceRights');
+const cosyvoiceCheckButton = document.getElementById('cosyvoiceCheckButton');
+const cosyvoiceLocalStatus = document.getElementById('cosyvoiceLocalStatus');
 const speakerRow = document.getElementById('speakerRow');
 const speakerSelect = document.getElementById('speakerSelect');
 const volume = document.getElementById('volume');
@@ -294,9 +297,17 @@ function startVoice(voice) {
     noiseScaleW: preset.noiseScaleW,
     debug: new URLSearchParams(location.search).get('debug') === '1',
     voiceId: voice.id,
+    // Native requests use the same per-run CSRF token as /api/save. Never
+    // transmit it to another origin or to the standalone CrispASR server.
+    apiToken: document.querySelector('meta[name="ra-token"]')?.content || '',
+    consentAttestation: voice.backend === 'cosyvoice3-local' && cosyvoiceRights.checked
+      ? 'I have the rights to use this voice' : '',
+    nativeVoice: voice.nativeVoice || '',
   });
   const steadyTag = voice.architecture === 'vits' && deliveryPreset === 'steady' ? ' (Steady)' : '';
-  setStatus('loading', `Loading ${voice.name}${steadyTag}…`, 'Reading the offline voice from this drive.');
+  setStatus('loading', `Loading ${voice.name}${steadyTag}…`, voice.backend === 'cosyvoice3-local'
+    ? 'Checking the native CosyVoice server on this computer…'
+    : 'Reading the offline voice from this drive.');
   updateButtons();
 }
 
@@ -332,6 +343,45 @@ function renderVoiceSelect() {
   }
   if (currentVoice) voiceSelect.value = currentVoice.id;
   voiceSelect.disabled = voiceCatalog.length < 2;
+}
+
+// The native engine appears only after explicit rights acknowledgment AND a
+// successful health check. This never starts an external process or downloads
+// models. The original WASM proofreading voices remain the default.
+async function discoverLocalCosyVoice() {
+  if (!cosyvoiceRights.checked) {
+    cosyvoiceLocalStatus.textContent = 'Confirm your rights to use the voice before enabling native speech.';
+    return;
+  }
+  if (openedDirectly) {
+    cosyvoiceLocalStatus.textContent = 'Open Read-Aloud through its local START launcher.';
+    return;
+  }
+  cosyvoiceCheckButton.disabled = true;
+  cosyvoiceLocalStatus.textContent = 'Checking the local CrispASR speech server…';
+  try {
+    const res = await fetch('/api/tts/cosyvoice/status', {cache:'no-store'});
+    if (!res.ok) throw new Error('The local launcher has no CosyVoice connector.');
+    const status = await res.json();
+    if (status.state !== 'ready') {
+      cosyvoiceLocalStatus.textContent = String(status.message || 'Local native speech is unavailable.');
+      return;
+    }
+    if (!voiceCatalog.some((v) => v.id === 'cosyvoice3-gguf-fleurs-en')) {
+      voiceCatalog.push({
+        id:'cosyvoice3-gguf-fleurs-en', name:'CosyVoice 3 GGUF — English',
+        quality:'experimental', backend:'cosyvoice3-local', architecture:'cosyvoice3',
+        nativeVoice:'fleurs-en', lockedSpeaker:true,
+      });
+      renderVoiceSelect();
+    }
+    cosyvoiceLocalStatus.textContent = 'Local CosyVoice is available in the Voice dropdown. Spoken AI disclosure is included in each WAV.';
+  } catch (err) {
+    cosyvoiceLocalStatus.textContent = 'Could not reach local CosyVoice: ' +
+      String((err && err.message) || err);
+  } finally {
+    cosyvoiceCheckButton.disabled = false;
+  }
 }
 
 function loadVoiceCatalog() {
@@ -2177,7 +2227,9 @@ function handleWorkerMessage(event) {
       renderSpeakerSelect();
       setStatus('ready', `${voiceName()} is ready`, integrityProblem
         ? `Warning: ${integrityProblem} — the voice loaded, but re-copy the bundle if anything sounds wrong.`
-        : 'Place the cursor and press F8, or render the whole draft below.');
+        : currentVoice && currentVoice.backend === 'cosyvoice3-local'
+          ? 'Press F8. Experimental GGUF audio includes a spoken AI disclaimer per sentence.'
+          : 'Place the cursor and press F8, or render the whole draft below.');
       updateButtons();
       break;
     case 'sherpa-onnx-tts-result':
@@ -2217,6 +2269,17 @@ function handleWorkerError(event) {
   updateButtons();
 }
 
+cosyvoiceCheckButton.addEventListener('click', () => { void discoverLocalCosyVoice(); });
+cosyvoiceRights.addEventListener('change', () => {
+  if (cosyvoiceRights.checked) return;
+  if (currentVoice && currentVoice.backend === 'cosyvoice3-local') {
+    const portable = voiceCatalog.find((v) => v.backend !== 'cosyvoice3-local');
+    if (portable) switchVoice(portable.id);
+  }
+  voiceCatalog = voiceCatalog.filter((v) => v.backend !== 'cosyvoice3-local');
+  renderVoiceSelect();
+  cosyvoiceLocalStatus.textContent = 'Local voice disabled until rights are confirmed.';
+});
 readButton.addEventListener('click', startReading);
 stopButton.addEventListener('click', () => stopAll());
 renderButton.addEventListener('click', startRender);
