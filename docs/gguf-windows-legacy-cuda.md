@@ -1,5 +1,7 @@
 # Experimental Windows CUDA 12.6 build for legacy Intel CPUs
 
+> **Current status (2026-10-18): Working speech has been confirmed on the actual i5-2400 + GTX 1650!** The first quantized CosyVoice3 RL WAV was generated and auditioned successfully. This original build guide includes historical pre-test wording; for the **verified results, backup expiry date, cleanup safety and next steps**, read [the project handoff](HANDOFF_COSYVOICE_GGUF.md). PR #7 remains draft because the Read-Aloud integration and wider compatibility still need work.
+
 This is a **separate experiment** from the native Python CosyVoice3 pilot in PR #6 and from the portable Read-Aloud app. It does not change the proofreader or install anything on a user's computer.
 
 ## Why
