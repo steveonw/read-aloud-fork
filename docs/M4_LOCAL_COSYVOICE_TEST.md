@@ -1,5 +1,7 @@
 # M4a — Experimental local CosyVoice3 GGUF bridge
 
+> **Resume after the two-launcher / port-17391 404 issue:** Read the [latest M4 project handoff](HANDOFF_M4_COSYVOICE_GGUF.md). The native server at `127.0.0.1:18080/health` was verified ready; `127.0.0.1:17391/api/tts/cosyvoice/status` returned 404 while two Read-Aloud copies were open. The next diagnostic is to restart **only the M4 test launcher** and check its **actual browser port** before reinstalling or changing anything.
+
 **Status: draft feature branch, not merged or included in a normal USB release.**
 This deliberately small integration connects the working **CrispASR v0.8.43
 GGUF/Q4_K RL** binary to the existing **Read-Aloud F8 proofreader**. There is no
