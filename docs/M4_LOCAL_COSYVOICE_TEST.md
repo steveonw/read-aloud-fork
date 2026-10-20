@@ -8,7 +8,7 @@ This adds an optional **CrispASR / CosyVoice 3 GGUF English voice** to the exist
 
 - A **working Read-Aloud USB folder** to copy for testing. The M4 download is an **update kit, not the full app**.
 - A working Windows x64 CrispASR v0.8.43 GGUF executable, its required CUDA files (if using GPU), and local CosyVoice model files. On the tested Intel i5-2400 / GTX 1650, use the **custom legacy-CPU + CUDA build**, not an executable requiring AVX2. See [draft PR #7](https://github.com/steveonw/read-aloud-fork/pull/7).
-- Git Bash for starting CrispASR. You do **not** need to build the Go launcher locally; the GitHub test kit contains the Windows launcher.
+- The optional [CrispASR Server Control mini-program](../tools/crispasr-server-control/README.md), or Git Bash if you prefer starting the server manually. You do **not** need to build the Go launcher locally; the GitHub test kit contains the Windows launcher.
 
 ## 1. Set up a separate test copy
 
@@ -19,9 +19,11 @@ This adds an optional **CrispASR / CosyVoice 3 GGUF English voice** to the exist
 
 The test launcher and original working launcher should **not** be run at the same time. If the launcher's integrity warning reports checksum mismatches after applying the update, treat it as a **separate packaging issue**; do not delete the checksum file or disregard unknown mismatches. The exact older five-file warning has not been fully diagnosed.
 
-## 2. Start CrispASR once in Git Bash
+## 2. Start CrispASR (mini-program or Git Bash)
 
-On the tested Windows computer, use the already working `~/crispasr-gguf-legacy` directory:
+**Option A — mini-program, no Git Bash:** [Download CrispASR Server Control for Windows](https://github.com/steveonw/read-aloud-fork/actions/runs/39374421045/artifacts/12243165572). Extract the ZIP and run **CrispASR Server Control.exe**. Select your existing `crispasr.exe` if it is not found automatically, then click **Start server**. It opens a minimized native console for messages, waits for the familiar port `18080`, and lets you click **Stop server** later. You may close the control panel while the server keeps running. Its Stop button is intentionally disabled if another instance was started manually in Git Bash: stop that old instance with Ctrl+C first. [Mini-program details and source](../tools/crispasr-server-control/README.md).
+
+**Option B — manual Git Bash command:** On the tested Windows computer, use the already working `~/crispasr-gguf-legacy` directory:
 
 ```bash
 cd ~/crispasr-gguf-legacy
@@ -37,7 +39,7 @@ Wait for:
 crispasr-server: listening on 127.0.0.1:18080
 ```
 
-**Leave Git Bash open** while using Read-Aloud. Do not restart CrispASR for every sentence. The models are cached and loaded once per server session. `-m auto` may need internet access to obtain missing weights on the first run; it uses cached files thereafter.
+**If using Git Bash, leave it open** while using Read-Aloud. If using the mini-program, its native server console can remain minimized. Do not restart CrispASR for every sentence. The models are cached and loaded once per server session. `-m auto` may need internet access to obtain missing weights on the first run; it uses cached files thereafter.
 
 Optional status check: open [http://127.0.0.1:18080/health](http://127.0.0.1:18080/health) on the same Windows computer. Keep the server bound to `127.0.0.1`, **not** `0.0.0.0`.
 

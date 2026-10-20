@@ -19,6 +19,12 @@ The browser stitches native speech into new WAV/MP3 files, losing native signed 
 
 **GitHub verification:** successful [M4 Windows test-kit build + Node/Go contract tests](https://github.com/steveonw/read-aloud-fork/actions/runs/39358205181) and successful [core regression](https://github.com/steveonw/read-aloud-fork/actions/runs/39358205111) on the first M4b implementation commit `b22d35e`. Follow-up MP3-mode metadata race fix is in progress. **This note is historical: the later M4b Windows MP3 did verify clean speech.** Leave PR #9 draft until that test and review.
 
+### Optional native-server Start/Stop mini-program (2026-10-20 UTC)
+
+A separate Windows Forms utility was added under [`tools/crispasr-server-control/`](../tools/crispasr-server-control/README.md), **without changing Read-Aloud, CrispASR, the GGUF weights, or the original USB copy**. It runs the user's existing `crispasr.exe` from `~/crispasr-gguf-legacy` with exactly the known-good `cosyvoice3-tts-rl`, `fleurs-en`, rights acknowledgment, and `127.0.0.1:18080` flags. It displays health, starts a minimized native console and remembers the PID, start timestamp, and executable path. **Stop is allowed only for that verified owned instance**, so a server started in Git Bash is reported as external and cannot be killed accidentally. Closing the UI leaves the managed engine running; reopening it permits stopping. This does **not** enable automatic startup within Read-Aloud and does not yet select Qwen engines.
+
+[Windows CI build + offline configuration tests passed](https://github.com/steveonw/read-aloud-fork/actions/runs/39374421045). [Optional Windows EXE artifact](https://github.com/steveonw/read-aloud-fork/actions/runs/39374421045/artifacts/12243165572) (ZIP containing EXE, instructions, and complete source; temporary artifact). **Actual user-machine GUI startup/stop behavior remains to be confirmed.**
+
 ### Newest checkpoint — tested M4c uppercase handling on Windows
 
 - User supplied **`read-aloud-narration(4).mp3` and `read-aloud-narration-labels(2).txt`** in the ChatGPT conversation, **not in GitHub**. Exact label spans: `0.00–0.76 HEY!`; `0.76–3.60 STOP RIGHT THERE!`; `3.60–6.16 F.B.I. is here.`.
