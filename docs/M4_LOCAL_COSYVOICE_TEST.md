@@ -114,13 +114,17 @@ The transformation is applied only when submitting a CosyVoice native
 request; displayed text, highlight positions, labels, and the
 Amy/Lessac workers stay exactly as before.
 
-**Manual acceptance test:** leave the CrispASR Git Bash server running;
-install the latest successful GitHub M4 overlay into the separate **M4
-test copy**, restart Read-Aloud, then listen to:
-`HEY! STOP RIGHT THERE! F.B.I. is here.`
-Check that ordinary words are spoken rather than spelled, dotted initials
-remain initials, and Amy and Lessac remain unchanged. Mock tests cannot
-prove that the model will pronounce every word correctly.
+**Live Windows acceptance result:** the user tested this exact phrase in
+`read-aloud-narration(4).mp3` after installing the simplified update.
+`HEY!` and `STOP RIGHT THERE!` were pronounced as words. The labels
+identified `F.B.I. is here.` as one segment, but the initials sounded
+approximately like “fee bee eye” rather than clear “eff bee eye”.
+
+**Next optional test (no code change yet):** compare the spoken output
+of `F.B.I.`, `F B I`, and `eff bee eye` in the isolated test copy.
+Keep the CrispASR Git Bash server running and leave the accepted
+uppercase-word workaround and Amy/Lessac unchanged. The MP3 and labels
+were uploaded in conversation only, not to this repository.
 
 ## 4. Important limitations
 
