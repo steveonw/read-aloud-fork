@@ -1,5 +1,7 @@
 # Project handoff — M4 Read-Aloud + local CosyVoice 3 GGUF
 
+**Start here for the current project goal and next session:** [HANDOFF_NEXT_SESSION.md](HANDOFF_NEXT_SESSION.md). This longer file is engineering history; older priorities below (e.g. acronym tests) may be superseded by the current handoff.
+
 **Updated:** 2026-10-19 (US Eastern; GitHub work continued 2026-10-20 UTC)  
 **Repository:** [steveonw/read-aloud-fork](https://github.com/steveonw/read-aloud-fork)  
 **Current work:** [Issue #8](https://github.com/steveonw/read-aloud-fork/issues/8) / [DRAFT PR #9](https://github.com/steveonw/read-aloud-fork/pull/9) (`m4/local-cosyvoice-bridge`)  

@@ -20,6 +20,7 @@ stays loaded between sentences. No Python/PyTorch setup is needed.
 
 - **[CosyVoice setup and usage guide](docs/M4_LOCAL_COSYVOICE_TEST.md)** — short Windows instructions, narration mode, exports and limitations.
 - **[CrispASR Server Control (Windows mini-program)](tools/crispasr-server-control/README.md)** — optional Start/Stop GUI for the existing separate native server; no Git Bash required after initial setup.
+- **[Current handoff and next steps](docs/HANDOFF_NEXT_SESSION.md)** — latest tested state, Qwen paragraph-acting roadmap and resume instructions.
 - **[Technical handoff](docs/HANDOFF_M4_COSYVOICE_GGUF.md)** — detailed engineering history and tested environment.
 - **[Issue #8](https://github.com/steveonw/read-aloud-fork/issues/8)** and **[draft PR #9](https://github.com/steveonw/read-aloud-fork/pull/9)** — feature development, still unmerged.
 
