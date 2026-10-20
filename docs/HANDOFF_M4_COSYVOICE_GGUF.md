@@ -1,9 +1,9 @@
 # Project handoff — M4 Read-Aloud + local CosyVoice 3 GGUF
 
-**Updated:** 2026-10-19, late evening (US Eastern; user evidence posted 2026-10-20 UTC)  
+**Updated:** 2026-10-19 (US Eastern; GitHub work continued 2026-10-20 UTC)  
 **Repository:** [steveonw/read-aloud-fork](https://github.com/steveonw/read-aloud-fork)  
 **Current work:** [Issue #8](https://github.com/steveonw/read-aloud-fork/issues/8) / [DRAFT PR #9](https://github.com/steveonw/read-aloud-fork/pull/9) (`m4/local-cosyvoice-bridge`)  
-**Resume point:** The native CrispASR/CosyVoice 3 GGUF engine, Go bridge, Read-Aloud and clean two-sentence MP3 were verified working on the user's Windows i5-2400 + GTX 1650. The repeated spoken AI announcement is resolved in the session-only Narration Mode. User then reported ALL-CAPS pronunciation (`HEY` spelled H E Y). The newest experimental fix applies **only in the CosyVoice worker**: ordinary ALL-CAPS words are converted to first-letter uppercase (`HEY` → `Hey`, `FAFAFAFAD` → `Fafafafad`), while dotted initials (`F.B.I.`) remain untouched. No acronym allowlist; the previous approach was superseded at the user's request. Await new Windows audio listening verification; don't modify the working original USB or `main`, and keep the PR draft. The unrelated 5/37 integrity warning still needs checking.
+**Resume point:** **Real M4c Windows acceptance test now PASSED for ordinary uppercase words:** the user's MP3 says `HEY!` as “Hey!” and `STOP RIGHT THERE!` as words, after **CrispASR-only** speech normalization (`HEY`→`Hey`, `FAFAFAFAD`→`Fafafafad`). The dotted acronym `F.B.I.` is still imperfect (“fee bee eye”), even though its label remains one sentence. The previous M4b one-session Narration Mode removed the repeated spoken AI announcement. Next *proposed* diagnostic: test `F B I` versus `eff bee eye`, without changing accepted case handling yet. Original Amy/Lessac, USB installation, GGUF models, native binary and `main` stay untouched; PR #9 remains draft. Integrity warning 5/37 still needs inspection.
 
 This is the latest handoff. The [earlier M3 handoff](https://github.com/steveonw/read-aloud-fork/blob/m3/gguf-legacy-cuda/docs/HANDOFF_COSYVOICE_GGUF.md) records the complete legacy-CPU build and the successful standalone audio test.
 
@@ -19,35 +19,15 @@ The browser stitches native speech into new WAV/MP3 files, losing native signed 
 
 **GitHub verification:** successful [M4 Windows test-kit build + Node/Go contract tests](https://github.com/steveonw/read-aloud-fork/actions/runs/39358205181) and successful [core regression](https://github.com/steveonw/read-aloud-fork/actions/runs/39358205111) on the first M4b implementation commit `b22d35e`. Follow-up MP3-mode metadata race fix is in progress. **This note is historical: the later M4b Windows MP3 did verify clean speech.** Leave PR #9 draft until that test and review.
 
-### Newest checkpoint: M4b accepted; simplified M4c speech capitalization in progress
+### Newest checkpoint — tested M4c uppercase handling on Windows
 
-- User provided `read-aloud-narration(3).mp3` after checking Narration Mode:
-  "The storm was coming. The road was empty." The repeated AI
-  announcement was absent. Plain AI-generated MP3 metadata was present;
-  it was not a signed C2PA export. See [the PR acceptance note](https://github.com/steveonw/read-aloud-fork/pull/9#issuecomment-6281949216).
-- The user noticed native CosyVoice was spelling ALL-CAPS words (e.g.
-  `HEY` as H E Y), unlike the original Amy and Lessac voices.
-  The native implementation's text-normalization path may differ from
-  the original Python model; that causal diagnosis is not yet proven.
-- The first M4c patch used an uppercase acronym exception list, but the
-  user requested a **simpler rule restricted to CrispASR/CosyVoice**:
-  title-case every unpunctuated uppercase word and leave dotted initials
-  unchanged. Current experimental worker now sends `HEY` as `Hey`,
-  `FAFAFAFAD` as `Fafafafad`, `FBI` as `Fbi`, but leaves
-  `F.B.I.` unchanged. Uppercase contractions such as `DON'T` and
-  `I'M` remain readable. There is **no acronym allowlist**.
-- **Only `web/cosyvoice-local.worker.js` carries this speech-only
-  transformation.** The editor, highlighted spans, text labels, Go
-  proxy, and original Amy/Lessac workers are unchanged. The existing
-  voice-consent check, default spoken disclosure, optional Narration
-  Mode and watermark stay intact.
-- After the latest green GitHub M4 test-kit build, install the new
-  overlay only in the isolated M4 test copy (never the original USB).
-  Keep Git Bash CrispASR running and listen to
-  `HEY! STOP RIGHT THERE! F.B.I. is here.`. Only the actual user's
-  MP3 can verify whether the model speaks this wording correctly.
-  Spelling out `F.B.I.` is a model-language behavior to confirm, not
-  something the regex itself guarantees.
+- User supplied **`read-aloud-narration(4).mp3` and `read-aloud-narration-labels(2).txt`** in the ChatGPT conversation, **not in GitHub**. Exact label spans: `0.00–0.76 HEY!`; `0.76–3.60 STOP RIGHT THERE!`; `3.60–6.16 F.B.I. is here.`.
+- **Observed in audio:** `HEY!` is spoken as “Hey!”, not H E Y; `STOP RIGHT THERE!` is recognizable as ordinary words. This supports the simplified capitalization fix **for the phrases tested**. The example `FAFAFAFAD` has NOT been tested acoustically; nonsense may remain difficult to pronounce.
+- **Unresolved:** `F.B.I.` sounds roughly “fee bee eye” instead of clearly “eff bee eye”. Although the periods remain intact and `F.B.I. is here.` stays one label/segment, the native model's acronym rendering is imperfect. Short silences/rough transitions between parts may also merit later investigation.
+- **Exact implemented rule at `dc9e6d3`:** only `web/cosyvoice-local.worker.js` changes the *spoken request* text: `HEY!`→`Hey!`, `STOP RIGHT THERE!`→`Stop Right There!`, `FAFAFAFAD`→`Fafafafad`; `F.B.I.` stays `F.B.I.`. No acronym exception list; the editor, labels, highlighting, Go server and original Amy/Lessac workers are untouched.
+- **Earlier M4b success:** a separate user MP3 spoke “The storm was coming. The road was empty.” without a repeated AI voice announcement. The user accepted session-only project-level AI disclosure; default spoken disclosure and native watermark remain supported; re-encoded WAV/MP3 contain ordinary AI metadata, NOT signed C2PA.
+- **CI passed on the latest functional commit:** [M4 Windows Go/Node kit](https://github.com/steveonw/read-aloud-fork/actions/runs/39361970387) and [core regressions](https://github.com/steveonw/read-aloud-fork/actions/runs/39361970174). Automated tests used mocks; user's MP3 establishes narrow real speech acceptance.
+- **Proposed next test, not implemented:** compare `F.B.I.`, `F B I`, and `eff bee eye` to determine a reliable spoken reading. Do not change code until there is an accepted direction; do not disturb the accepted ALL-CAPS normalization.
 
 ### Confirmed on the actual user machine
 
@@ -57,15 +37,9 @@ The browser stitches native speech into new WAV/MP3 files, losing native signed 
 - Native startup loads **8 voices** from the built-in GGUF voice bank, including `fleurs-en`, with **CUDA0** active and the legacy CPU-compatible build. The generic `--voice-dir not set` startup warning did **not** prevent this actual named-bank voice from synthesizing audio through Read-Aloud. Do **not** add an arbitrary voice directory or change the working startup command on the basis of that warning alone.
 - Screen still shows **"Warning: 5 of 37 files on this drive failed their integrity check"** while the voice reports ready. A stale `SHA256SUMS.txt` from the original USB bundle is the *leading explanation*, because the M4 kit replaces five `shared/` files without regenerating the original manifest. **Not yet verified**: the names/hashes of the five failed files. Do not delete the checksum manifest, ignore unexpected DLL changes, or alter the original working USB copy.
 
-### Primary functional problem: AI disclosure repeated per sentence
+### Historical issue — repeated spoken AI disclaimer (resolved in M4b)
 
-The current M4 Go bridge deliberately omits a `spoken_disclaimer` override; the upstream server therefore uses its default `spoken_disclaimer=true` for **each separate sentence request**. The repeated ~3.44 s phrase makes the exported sequence unsuitable for practical narration; this is a **known product blocker**, not a GPU, networking or model-loading failure.
-
-**Remaining design and testing (M4b core feature now implemented on draft PR #9; further high-impact changes still require review):**
-1. Preserve informed voice-consent/rights checks. Design an **opt-in project-level disclosure/provenance workflow** that meets CrispASR's applicable marking-attestation rules before requesting `spoken_disclaimer=false` on individual narration lines. Preserve upstream watermark/C2PA handling where supported, and keep audible disclosure enabled until the alternative marking requirements are actually met; do **not** merely trim/strip the announcement from finished WAVs or suppress it silently.
-2. Exercise the upstream `POST /v1/audio/speech` request, Go proxy, browser worker, F8 playback, unchanged-sentence cache, and WAV/MP3 export with both default disclosure and an appropriately attested alternative mode. Add mocked tests; verify real resulting audio on the GTX 1650 before calling it ready.
-3. Independently address integrity reporting by identifying actual five failed files from launcher logs, then prepare a checksum-correct **complete test bundle** or properly validated overlay manifest process; retain diagnostics instead of hiding warnings.
-4. Once narrative audio is clean and policy-compliant, continue **persistent sentence takes, retakes/locking, project manifests, and acting controls** as distinct future features.
+Initial M4a requested sentences with the native default spoken AI disclaimer, once per line, disrupting continuous narration. **M4b now has an opt-in session-only project-disclosure mode**, confirmed by a real two-sentence MP3 without that announcement. The Go bridge checks upstream attestation and the native waveform watermark stays on. Finished WAV/MP3 metadata is unsigned; finished films still need an appropriate AI-generated-speech disclosure. This is no longer the active blocking problem. Current minor problem is how dotted acronyms sound.
 
 ### Authorization boundary for continuation
 
@@ -121,7 +95,7 @@ Custom build used `CRISPASR_PORTABLE_CPU=ON`, `GGML_CUDA=ON`, and `CMAKE_CUDA_AR
 - UI: optional voice-rights checkbox and **Find local CosyVoice GGUF** button in **CosyVoice Hardware Check (Optional)**; when healthy, adds `CosyVoice 3 GGUF — English (experimental)` to the Voice dropdown. Currently only `fleurs-en` preset.
 - Reuses existing in-tab unchanged-sentence audio cache, F8 pipeline, flagging/highlights, existing narration export controls; production-readiness and end-to-end export quality still require manual verification.
 - Does **not** automatically launch/stop native CrispASR, download a model, store durable multiple takes, apply paragraph acting directions, deploy to Hugging Face or control remote servers.
-- The native worker **does not disable the spoken AI disclosure**: CrispASR prefixes its disclosure to *each sentence* for this first test. Do not use this M4 edition for final movie audio yet; future project-level AI disclosure/marking must respect consent and provenance.
+- **Historical M4a** always spoke the AI disclaimer. **M4b** has verified opt-in narration-only speech with project-disclosure attestation (watermark stays on), while **M4c** has tested ALL-CAPS-word improvement; longer narration, durable takes and signed final-export provenance remain unfinished.
 
 **Green CI on exact pre-handoff M4 code head** `035eb61c8bc1c10e85ce95fa45c02ba06646c26b`:
 - [Core regression](https://github.com/steveonw/read-aloud-fork/actions/runs/39201631629) — success.
@@ -160,16 +134,15 @@ A second possibility: the test-copy `START - WINDOWS.exe` wasn't overlaid correc
 
 **30-minute inactivity behavior:** The Read-Aloud Go launcher includes an **idleTimeout = 30 minutes** and shuts down after inactivity. Closing the tab does **not** necessarily stop the local server immediately; use the UI's **Shut down Read-Aloud** when available, or wait for idle expiry. CrispASR runs independently in Git Bash and is stopped separately with Ctrl+C. The files/models remain saved.
 
-## 5. Resume checklist — current priorities (do not repeat solved install/network tests)
+## 5. Resume checklist — next focused work
 
-1. **Preserve today's success.** User has already demonstrated the CosyVoice voice selectable/ready in M4 Read-Aloud and supplied a real generated MP3. Keep the custom `~/crispasr-gguf-legacy` binary, model cache, audio backups, original USB app, and test-copy USB app intact. Do not reinstall Python, CUDA, or GGUF models and do not repeat the basic 404 troubleshooting unless the bridge genuinely regresses.
-2. **Discuss disclosure architecture before changing code.** Highest-priority blocker is the repeated **"This audio was generated by artificial intelligence"** sentence, not failing speech generation. Review CrispASR's actual `spoken_disclaimer=false` attestation/marking gates, distinguish preset/clone requirements, and propose a transparent project-level disclosure, export provenance, and consent UX. Keep watermark/C2PA as applicable and an appropriately disclosed default.
-3. **Request explicit approval for implementation.** The user has authorized this **handoff update**, but previously prohibited unapproved application changes. Do not alter any source file, working binary, generated audio, `main`, or PR merge status until they approve a specific next step.
-4. **When approved, implement on draft PR #9 (or a clearly separated feature branch)** with targeted Go/JS tests; preserve Amy/WASM, existing F7/F8/F9/F10 functions, sentence caching, editing, and exports. Test that per-line narration does not repeat the spoken announcement only under valid alternative-disclosure attestation, and ensure default mode remains disclosed.
-5. **Diagnose the USB integrity warning separately.** Examine launcher integrity log for the exact five failed paths. Do not suppress the checks or delete `SHA256SUMS.txt` simply to hide the warning. Package a complete reproducible test copy / verified overlay with correct manifest when appropriate.
-6. **Then** verify the full sentence retake, cache and final WAV/MP3 workflow on the user's hardware, followed by persistent multiple takes/locked clips and later acting-direction controls. Avoid claiming final film production readiness until successful real tests and disclosure design.
+1. **Do not reinstall or rebuild** the verified old-CPU CUDA CrispASR binary, GGUF weights or Python. Keep Git Bash CrispASR at loopback `127.0.0.1:18080`; the Read-Aloud Go launcher remains separate. Always test in the isolated M4 folder; preserve original USB and `main`.
+2. **Accept ordinary ALL-CAPS improvement for the tested phrases only.** `HEY` and `STOP RIGHT THERE` now sound like words. Keep the simple title-case rule only in the native CosyVoice speech worker. The invented example `FAFAFAFAD` remains untested.
+3. **If desired, test only the dotted acronym next.** `F.B.I.` stays one labeled segment but sounds closer to “fee bee eye”. Try `F B I` and `eff bee eye` in short samples before proposing a narrow pronunciation control; no code change yet.
+4. **Later:** measure sentence-boundary silence/roughness separately from pronunciation; inspect exact 5/37 integrity mismatch paths rather than disabling checks; test many-minute narration, retakes/locked takes and signed provenance. Keep the native watermark and transparent project AI disclosure.
+5. **Keep PR #9 draft** and original installation/branch untouched unless the user explicitly authorizes further changes or merging.
 
-**Current acceptance achieved:** CosyVoice 3 local model started successfully, Read-Aloud voice selected, multi-sentence synthesis and MP3 export produced. **Not yet accepted:** clean narration without per-sentence disclaimer, checksum-clean test package, saved multiple takes, emotional direction, and production-grade export.
+**Accepted live:** native speech on i5-2400/GTX 1650, Read-Aloud Go bridge, clean short MP3 with project-level AI disclosure, and uppercase-word handling for `HEY` / `STOP RIGHT THERE`. **Pending:** clear `F.B.I.`, long-form durability, sample-boundary polish, verified portable checksum integrity, persistent take management, final signed provenance.
 
 ## 6. Preserve, cleanups and historical experiments
 
@@ -182,31 +155,13 @@ A second possibility: the test-copy `START - WINDOWS.exe` wasn't overlaid correc
 
 ## 7. Copy/paste summary for another conversation
 
-> Continue Issue #8 / draft PR #9 `m4/local-cosyvoice-bridge` in
-> `steveonw/read-aloud-fork`. User's Win64 i5-2400 (no AVX2) + GTX 1650
-> runs custom CrispASR v0.8.43 GGUF CosyVoice3 CUDA binary from
-> `~/crispasr-gguf-legacy`; existing server on 127.0.0.1:18080 works.
-> Read-Aloud Go server at 127.0.0.1:17391 (or auto-assigned port)
-> forwards sentence requests. M4b session-only Narration Mode successfully
-> eliminated the repeated AI voice announcement on user's real
-> two-sentence MP3, while native watermark and unsigned metadata remain.
-> Latest issue: all-uppercase `HEY` is spelled H E Y. **User explicitly
-> requested a simple rule for only the CrispASR voice**: title-case
-> unpunctuated uppercase words (`HEY` → `Hey`; `FAFAFAFAD` →
-> `Fafafafad`) and keep dotted initials `F.B.I.` unchanged.
-> The earlier hard-coded acronym exception list has been removed from the
-> native worker. Amy/Lessac, original editor text, labels, highlights,
-> user USB installation and main branch MUST remain untouched.
-> Await new M4 Windows CI and the user's listening test. There is still a
-> separate USB integrity warning 5 of 37 files; investigate file hashes
-> before changing manifest. Never reinstall models/Python or merge draft
-> PR #9 without the user's explicit go-ahead.
+> Project `steveonw/read-aloud-fork`, Issue #8 / draft PR #9 branch `m4/local-cosyvoice-bridge`. Keep `main`, original USB copy, and tested `~/crispasr-gguf-legacy` binary/GGUF cache unchanged. User's Windows i5-2400 without AVX2 and GTX 1650 run local CrispASR v0.8.43 GGUF CUDA; Read-Aloud Go proxy connects on loopback. M4b opt-in Narration Mode was verified with the two-sentence `read-aloud-narration(3).mp3` and no repeated AI voice announcement; native watermark remains ON, exported AI ID3 metadata is unsigned. **Most recent M4c acceptance:** `read-aloud-narration(4).mp3` with labels `0–0.76 HEY!`, `0.76–3.60 STOP RIGHT THERE!`, `3.60–6.16 F.B.I. is here.`. HEY and STOP RIGHT THERE are pronounced as ordinary words using simple *CrispASR-only* title-casing (`HEY`→`Hey`, `FAFAFAFAD`→`Fafafafad`); Amy/Lessac and editor unchanged. `F.B.I.` remains an imperfect “fee bee eye”; its label is one sentence. Proposed *no-code* next probes: `F B I`, `eff bee eye`; don't rewrite title-casing. Some minor gaps and old 5-of-37 integrity warning remain. M4 and core CI green at `dc9e6d3`. User MP3/labels are in chat only, not GitHub. Don't merge or change native binary without approval.
 
 ## Links
 
 - [Full older M3 success handoff](https://github.com/steveonw/read-aloud-fork/blob/m3/gguf-legacy-cuda/docs/HANDOFF_COSYVOICE_GGUF.md)
 - [M4 test setup instructions](https://github.com/steveonw/read-aloud-fork/blob/m4/local-cosyvoice-bridge/docs/M4_LOCAL_COSYVOICE_TEST.md)
-- [M4 Windows test kit](https://github.com/steveonw/read-aloud-fork/actions/runs/39201631639/artifacts/12163748524) (temporary)
+- [Latest successful M4c Windows test kit](https://github.com/steveonw/read-aloud-fork/actions/runs/39361970387/artifacts/12237194691) (temporary overlay, not full USB app)
 - [M4 PR #9](https://github.com/steveonw/read-aloud-fork/pull/9)
 - [M4 issue #8](https://github.com/steveonw/read-aloud-fork/issues/8)
 - [Legacy CUDA PR #7](https://github.com/steveonw/read-aloud-fork/pull/7)
