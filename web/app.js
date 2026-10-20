@@ -42,6 +42,7 @@ const sessionFile = document.getElementById('sessionFile');
 const quitButton = document.getElementById('quitButton');
 const voiceSelect = document.getElementById('voiceSelect');
 const cosyvoiceRights = document.getElementById('cosyvoiceRights');
+const cosyvoiceProjectDisclosure = document.getElementById('cosyvoiceProjectDisclosure');
 const cosyvoiceCheckButton = document.getElementById('cosyvoiceCheckButton');
 const cosyvoiceLocalStatus = document.getElementById('cosyvoiceLocalStatus');
 const speakerRow = document.getElementById('speakerRow');
@@ -303,6 +304,7 @@ function startVoice(voice) {
     consentAttestation: voice.backend === 'cosyvoice3-local' && cosyvoiceRights.checked
       ? 'I have the rights to use this voice' : '',
     nativeVoice: voice.nativeVoice || '',
+    projectDisclosure: voice.backend === 'cosyvoice3-local' && cosyvoiceRights.checked && cosyvoiceProjectDisclosure.checked,
   });
   const steadyTag = voice.architecture === 'vits' && deliveryPreset === 'steady' ? ' (Steady)' : '';
   setStatus('loading', `Loading ${voice.name}${steadyTag}…`, voice.backend === 'cosyvoice3-local'
@@ -375,7 +377,9 @@ async function discoverLocalCosyVoice() {
       });
       renderVoiceSelect();
     }
-    cosyvoiceLocalStatus.textContent = 'Local CosyVoice is available in the Voice dropdown. Spoken AI disclosure is included in each WAV.';
+    cosyvoiceLocalStatus.textContent = cosyvoiceProjectDisclosure.checked
+      ? 'CosyVoice ready. Narration mode: no repeated spoken announcement; remember your project disclosure.'
+      : 'CosyVoice ready. The spoken AI announcement stays on unless you select narration mode.';
   } catch (err) {
     cosyvoiceLocalStatus.textContent = 'Could not reach local CosyVoice: ' +
       String((err && err.message) || err);
@@ -538,7 +542,10 @@ function buildSegments(text, from, to) {
       end: s.end,
       text: spoken,
       speed: spd,
+      // Two disclosure modes must never share a cached sentence recording.
       key: (currentVoice ? currentVoice.id : 'none') + '#' + currentSpeaker + '#' + deliveryPreset +
+        (currentVoice && currentVoice.backend === 'cosyvoice3-local'
+          ? '#' + (cosyvoiceProjectDisclosure.checked ? 'project' : 'spoken') : '') +
         '|' + spd.toFixed(2) + '|' + spoken,
     };
   });
@@ -1351,7 +1358,10 @@ function exportWav() {
   dv.setUint32(40, pcm.length * 2, true);
   new Int16Array(wav, 44).set(pcm);
 
-  void saveOrDownload('audio', 'read-aloud-narration.wav', new Blob([wav], {type: 'audio/wav'}), 'WAV exported');
+  // Stitching PCM loses native signed WAV metadata; re-label the result.
+  const markedWav = currentVoice && currentVoice.backend === 'cosyvoice3-local'
+    ? window.ReadAloudProvenance.markWav(wav) : wav;
+  void saveOrDownload('audio', 'read-aloud-narration.wav', new Blob([markedWav], {type: 'audio/wav'}), 'WAV exported');
   maybeExportLabels(labels);
 
   const seconds = Math.round(totalSamples / sampleRate);
@@ -1380,7 +1390,9 @@ function exportMp3() {
       refreshNarrationInfo();
       return;
     }
-    void saveOrDownload('audio', 'read-aloud-narration.mp3', new Blob(msg.chunks, {type: 'audio/mpeg'}), 'MP3 exported');
+    const mp3Parts = currentVoice && currentVoice.backend === 'cosyvoice3-local'
+      ? window.ReadAloudProvenance.markMp3(msg.chunks) : msg.chunks;
+    void saveOrDownload('audio', 'read-aloud-narration.mp3', new Blob(mp3Parts, {type: 'audio/mpeg'}), 'MP3 exported');
     maybeExportLabels(labels);
     const seconds = Math.round(totalSamples / sampleRate);
     const mm = Math.floor(seconds / 60);
@@ -2270,8 +2282,29 @@ function handleWorkerError(event) {
 }
 
 cosyvoiceCheckButton.addEventListener('click', () => { void discoverLocalCosyVoice(); });
+cosyvoiceProjectDisclosure.addEventListener('change', () => {
+  if (cosyvoiceProjectDisclosure.checked && !cosyvoiceRights.checked) {
+    cosyvoiceProjectDisclosure.checked = false;
+    cosyvoiceLocalStatus.textContent = 'Confirm your voice rights before enabling narration mode.';
+    return;
+  }
+  cosyvoiceLocalStatus.textContent = cosyvoiceProjectDisclosure.checked
+    ? 'Narration mode selected for this session. Include AI disclosure in your finished project.'
+    : 'The spoken AI announcement will return for new CosyVoice sentences.';
+  if (!currentVoice || currentVoice.backend !== 'cosyvoice3-local') return;
+  // The native worker takes mode on init. Cancel pending work and restart it;
+  // previous and new takes remain correctly separated by the cache key.
+  stopAll({restarting: true});
+  if (worker) worker.terminate();
+  requestQueue.length = 0;
+  runToken++;
+  startVoice(currentVoice);
+  refreshNarrationInfo();
+  describeSelection();
+});
 cosyvoiceRights.addEventListener('change', () => {
   if (cosyvoiceRights.checked) return;
+  cosyvoiceProjectDisclosure.checked = false;
   if (currentVoice && currentVoice.backend === 'cosyvoice3-local') {
     const portable = voiceCatalog.find((v) => v.backend !== 'cosyvoice3-local');
     if (portable) switchVoice(portable.id);

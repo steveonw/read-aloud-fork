@@ -67,6 +67,7 @@ func TestCosyVoiceBridgeHealthAndSpeech(t *testing.T) {
 		case "/v1/audio/speech":
 			if r.Method != http.MethodPost { t.Error("upstream method", r.Method) }
 			_ = json.NewDecoder(r.Body).Decode(&posted)
+			if posted["spoken_disclaimer"] == false { w.Header().Set("X-Crispasr-Spoken-Disclaimer", "skipped") }
 			w.Header().Set("Content-Type", "audio/wav")
 			_, _ = w.Write(fakeCosyVoiceWav())
 		default:
@@ -93,6 +94,11 @@ func TestCosyVoiceBridgeHealthAndSpeech(t *testing.T) {
 		t.Errorf("incorrect upstream payload: %#v", posted)
 	}
 	if posted["response_format"] != "wav" { t.Error("request changed output format") }
+	if posted["marking_attestation"] != nil { t.Error("default unexpectedly requested opt-out") }
+	clean := `{"input":"The storm was coming.","voice":"fleurs-en","speed":1,"consentAttestation":"I have the rights to use this voice","projectDisclosure":true}`
+	cleanRR := testCosyVoicePost(t, h, clean, testCosyVoiceToken)
+	if cleanRR.Code != http.StatusOK || !bytes.Equal(cleanRR.Body.Bytes(), fakeCosyVoiceWav()) { t.Fatalf("expected clean WAV, got %d (%s)", cleanRR.Code, cleanRR.Body.String()) }
+	if posted["spoken_disclaimer"] != false || posted["marking_attestation"] != "I will disclose this narration as AI-generated in my published project." { t.Errorf("clean mode not attested: %#v", posted) }
 }
 
 func TestCosyVoiceBridgeRejectsBadRequests(t *testing.T) {
@@ -118,6 +124,9 @@ func TestCosyVoiceBridgeRejectsBadRequests(t *testing.T) {
 		{"too much text", `{"input":"`+strings.Repeat("x",2010)+`","voice":"fleurs-en","speed":1,"consentAttestation":"I have the rights to use this voice"}`,testCosyVoiceToken,400},
 		{"out of range speed",`{"input":"Test","voice":"fleurs-en","speed":90,"consentAttestation":"I have the rights to use this voice"}`,testCosyVoiceToken,400},
 		{"unexpected URL key", `{"input":"Test","voice":"fleurs-en","speed":1,"consentAttestation":"I have the rights to use this voice","url":"https://example.net"}`,testCosyVoiceToken,400},
+		{"injected marking", `{"input":"Test","voice":"fleurs-en","speed":1,"consentAttestation":"I have the rights to use this voice","marking_attestation":"fake"}`,testCosyVoiceToken,400},
+		{"injected native flag", `{"input":"Test","voice":"fleurs-en","speed":1,"consentAttestation":"I have the rights to use this voice","spoken_disclaimer":false}`,testCosyVoiceToken,400},
+		{"invalid mode type", `{"input":"Test","voice":"fleurs-en","speed":1,"consentAttestation":"I have the rights to use this voice","projectDisclosure":"yes"}`,testCosyVoiceToken,400},
 		{"invalid WAV",good,testCosyVoiceToken,502},
 	}
 	for _, tc := range cases {
@@ -138,6 +147,25 @@ func TestCosyVoiceBridgeRejectsBadRequests(t *testing.T) {
 	e := httptest.NewRecorder()
 	h.ServeHTTP(e,externalHost)
 	if e.Code != 403 { t.Fatal("external Host header accepted") }
+}
+
+func TestCosyVoiceCleanModeFailsClosedWithoutNativeConfirmation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"status":"ok","backend":"cosyvoice3-tts-rl"}`)
+			return
+		}
+		w.Header().Set("X-Crispasr-Spoken-Disclaimer", "applied")
+		w.Header().Set("Content-Type", "audio/wav")
+		_, _ = w.Write(fakeCosyVoiceWav())
+	}))
+	defer server.Close()
+	h := newCosyVoiceLocalHandler(testCosyVoiceToken, server.URL)
+	body := `{"input":"Test.","voice":"fleurs-en","speed":1,"consentAttestation":"I have the rights to use this voice","projectDisclosure":true}`
+	rr := testCosyVoicePost(t, h, body, testCosyVoiceToken)
+	if rr.Code != 502 || !strings.Contains(rr.Body.String(), "did not confirm") {
+		t.Fatalf("unconfirmed clean mode should fail: %d %s", rr.Code, rr.Body.String())
+	}
 }
 
 func TestCosyVoiceBridgeNeverAcceptsWrongBackend(t *testing.T) {

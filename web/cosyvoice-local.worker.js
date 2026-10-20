@@ -9,6 +9,7 @@ let inFlight = false;
 let apiToken = '';
 let consentAttestation = '';
 let chosenVoice = 'fleurs-en';
+let projectDisclosure = false;
 
 function decodeMonoPCM16Wav(buffer) {
   if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 44 || buffer.byteLength > (16 << 20)) {
@@ -70,6 +71,7 @@ self.onmessage = async (event) => {
       apiToken = String(msg.apiToken || '');
       consentAttestation = String(msg.consentAttestation || '');
       chosenVoice = String(msg.nativeVoice || 'fleurs-en');
+      projectDisclosure = msg.projectDisclosure === true;
       if (!/^[0-9a-f]{48}$/.test(apiToken)) throw new Error('Please reopen Read-Aloud through its local launcher.');
       if (chosenVoice !== 'fleurs-en' || consentAttestation !== 'I have the rights to use this voice') {
         throw new Error('Please confirm your rights to use the local CosyVoice voice first.');
@@ -107,7 +109,8 @@ self.onmessage = async (event) => {
         input:String(msg.text || ''),
         voice:chosenVoice,
         speed:Number(msg.speed),
-        consentAttestation
+        consentAttestation,
+        projectDisclosure
       })
     });
     if (!res.ok) {

@@ -78,7 +78,8 @@ const msg=async data=>await self.onmessage({data});
   assert.equal(body.voice,'fleurs-en');
   assert.equal(body.speed,1);
   assert.equal(body.consentAttestation,'I have the rights to use this voice');
-  assert.ok(!body.url && !body.spoken_disclaimer);
+  assert.ok(!body.url && !body.spoken_disclaimer && !body.marking_attestation);
+  assert.equal(body.projectDisclosure,false);
 
   for(const [name,input,pattern] of [
     ['constant',makeWav({constant:true}),/silent|constant/],
@@ -94,5 +95,27 @@ const msg=async data=>await self.onmessage({data});
     assert.match(last().message,pattern,name);
   }
 
-  console.log('COSYVOICE WORKER: init, local-only token, WAV, request ids, silence and clipping checks passed');
+  const cleanCalls = [];
+  const cleanEvents = [];
+  const cleanSelf = {postMessage(message){ cleanEvents.push(message); }};
+  const cleanWorld = {
+    self: cleanSelf,
+    fetch: async (url, options) => {
+      cleanCalls.push({url,options});
+      if(url.endsWith('/status'))return {ok:true,json:async()=>({state:'ready'})};
+      return {ok:true,arrayBuffer:async()=>makeWav()};
+    },
+    ArrayBuffer, DataView, Uint8Array, Float32Array
+  };
+  vm.runInNewContext(fs.readFileSync(root+'/web/cosyvoice-local.worker.js','utf8'),cleanWorld);
+  const cleanMessage = async data => cleanSelf.onmessage({data});
+  await cleanMessage({type:'init',apiToken,nativeVoice:'fleurs-en',
+    consentAttestation:'I have the rights to use this voice', projectDisclosure:true});
+  assert.equal(cleanEvents.at(-1).type,'tts-ready');
+  await cleanMessage({type:'generate',id:99,text:'Test.',speed:1});
+  assert.equal(cleanEvents.at(-1).type,'tts-result');
+  const cleanBody = JSON.parse(cleanCalls.find(x=>x.url.endsWith('/speech')).options.body);
+  assert.equal(cleanBody.projectDisclosure,true);
+  assert.ok(!('marking_attestation' in cleanBody) && !('spoken_disclaimer' in cleanBody));
+  console.log('COSYVOICE WORKER: default disclosure, explicit narration mode, WAV and safety checks passed');
 })().catch(err=>{console.error(err);process.exitCode=1;});

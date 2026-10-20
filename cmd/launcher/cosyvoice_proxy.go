@@ -47,6 +47,7 @@ type cosyVoiceSpeechRequest struct {
 	Voice              string  `json:"voice"`
 	Speed              float64 `json:"speed"`
 	ConsentAttestation string  `json:"consentAttestation"`
+	ProjectDisclosure  bool    `json:"projectDisclosure"`
 }
 
 // queryCosyVoiceHealth verifies both liveness and active TTS backend. GPU
@@ -197,13 +198,18 @@ func newCosyVoiceLocalHandler(token, upstream string) http.Handler {
 			jsonError(w, http.StatusServiceUnavailable, status.Message)
 			return
 		}
-		// Keep the upstream's spoken disclosure ON for this early test. Movie
-		// export must not silently suppress provenance or clone consent.
-		payload, _ := json.Marshal(map[string]interface{}{
+		// Default stays disclosed. Opt-in accepts responsibility for a visible
+		// AI disclosure in the completed project; audio watermark stays on.
+		payload := map[string]interface{}{
 			"input": input.Input, "voice": input.Voice, "speed": input.Speed,
 			"response_format": "wav", "consent_attestation": input.ConsentAttestation,
-		})
-		request, err := http.NewRequestWithContext(r.Context(), http.MethodPost, upstream+"/v1/audio/speech", bytes.NewReader(payload))
+		}
+		if input.ProjectDisclosure {
+			payload["spoken_disclaimer"] = false
+			payload["marking_attestation"] = "I will disclose this narration as AI-generated in my published project."
+		}
+		rawPayload, _ := json.Marshal(payload)
+		request, err := http.NewRequestWithContext(r.Context(), http.MethodPost, upstream+"/v1/audio/speech", bytes.NewReader(rawPayload))
 		if err != nil {
 			jsonError(w, http.StatusBadGateway, "Could not prepare local speech request")
 			return
@@ -218,6 +224,11 @@ func newCosyVoiceLocalHandler(token, upstream string) http.Handler {
 		if res.StatusCode != http.StatusOK {
 			// Do not echo upstream errors (they may contain the user's text).
 			jsonError(w, http.StatusBadGateway, "Local CosyVoice could not synthesize this sentence")
+			return
+		}
+		// Do not mislabel a line containing a spoken notice as clean narration.
+		if input.ProjectDisclosure && res.Header.Get("X-Crispasr-Spoken-Disclaimer") != "skipped" {
+			jsonError(w, http.StatusBadGateway, "CrispASR did not confirm clean narration; check the native version and disclosure setting.")
 			return
 		}
 		raw, err := io.ReadAll(io.LimitReader(res.Body, cosyVoiceMaxAudioBytes+1))
