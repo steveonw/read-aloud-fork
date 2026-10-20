@@ -1,0 +1,52 @@
+# Independent optional native-server control utility. Does not touch main USB release.
+name: M4 CrispASR Windows server controller
+
+on:
+  push:
+    branches:
+      - m4/local-cosyvoice-bridge
+    paths:
+      - "tools/crispasr-server-control/**"
+      - ".github/workflows/m4-crispasr-server-control.yml"
+  pull_request:
+    paths:
+      - "tools/crispasr-server-control/**"
+      - ".github/workflows/m4-crispasr-server-control.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-controller:
+    name: Compile and self-check optional Windows controller
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile portable GUI EXE (no model downloads)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path -LiteralPath $compiler)) {
+            throw "Windows .NET Framework C# compiler not found"
+          }
+          New-Item -ItemType Directory -Force -Path "build/server-control" | Out-Null
+          & $compiler /nologo /target:winexe /platform:anycpu /optimize+ "/out:build/server-control/CrispASR Server Control.exe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "tools/crispasr-server-control/Program.cs"
+          if ($LASTEXITCODE -ne 0) { throw "Compilation failed with exit code $LASTEXITCODE" }
+          Copy-Item "tools/crispasr-server-control/README.md" "build/server-control/README.md"
+          Copy-Item "tools/crispasr-server-control/Program.cs" "build/server-control/Program.cs"
+      - name: Run offline startup-command and health-parser self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = Join-Path (Get-Location).Path 'build/server-control/CrispASR Server Control.exe'
+          $p = Start-Process -FilePath $exe -ArgumentList '--self-test' -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Self-test returned $($p.ExitCode)" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrispASR-Server-Control-Windows
+          path: build/server-control/*
+          if-no-files-found: error
+          retention-days: 30
