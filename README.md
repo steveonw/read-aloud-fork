@@ -5,6 +5,27 @@ Silicon, and Linux x64. The three operating systems use small native launchers;
 the large browser application, Sherpa WebAssembly engine, and converted Piper
 `en_US-amy-medium` voice are shared once.
 
+## Optional local CosyVoice 3 GGUF (experimental Windows feature)
+
+The `m4/local-cosyvoice-bridge` branch adds a **local CosyVoice 3 GGUF
+voice** to the existing Read-Aloud proofreader. It works alongside the
+built-in Amy and Lessac voices; those voices remain available and unchanged.
+It has produced intelligible short narration and MP3 exports on the tested
+Windows **Intel i5-2400 / GTX 1650** computer. This is a **draft feature**,
+not part of the normal USB release or a complete film-narration workflow.
+
+CrispASR runs locally as a separate speech server. Read-Aloud's existing
+Go launcher forwards speech requests to it over `127.0.0.1`, and the model
+stays loaded between sentences. No Python/PyTorch setup is needed.
+
+- **[CosyVoice setup and usage guide](docs/M4_LOCAL_COSYVOICE_TEST.md)** — short Windows instructions, narration mode, exports and limitations.
+- **[Technical handoff](docs/HANDOFF_M4_COSYVOICE_GGUF.md)** — detailed engineering history and tested environment.
+- **[Issue #8](https://github.com/steveonw/read-aloud-fork/issues/8)** and **[draft PR #9](https://github.com/steveonw/read-aloud-fork/pull/9)** — feature development, still unmerged.
+
+The GitHub M4 Windows artifact is **an update kit**, not a complete USB
+installation. Apply it only to a **separate copy** of a working Read-Aloud
+folder; never overwrite your only working installation.
+
 ## What is already included
 
 - A pure-Go loopback server/launcher.
@@ -147,10 +168,13 @@ SHERPA_TAG=v1.13.4 AMY_MODEL_URL=https://... ./scripts/build_all.sh
 
 ## Runtime privacy
 
-The launcher binds only to `127.0.0.1`. The browser loads local files from that
-loopback server. Text is passed only to the in-page WASM worker, and rendered
-audio is held in this tab's memory; a WAV file is written only when the user
-chooses Export.
+The launcher binds only to `127.0.0.1`; the browser loads files from
+that local address. The standard Amy/Lessac voice path processes text in a
+local WASM worker. On the **optional experimental CosyVoice branch**, the
+Read-Aloud Go server passes selected text to a **separately running local**
+CrispASR server on `127.0.0.1:18080`. Speech does not require a cloud TTS
+service, although CrispASR's `-m auto` can download missing model files
+during setup. Audio is exported to a file only when the user chooses Export.
 
 ## Switching between voice editions
 
