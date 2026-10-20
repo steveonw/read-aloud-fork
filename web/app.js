@@ -1374,6 +1374,9 @@ function exportMp3() {
   const built = buildNarrationPcm();
   if (!built) return;
   const {pcm, sampleRate, totalSamples, total, labels} = built;
+  // Capture the voice at export start: the user may switch voices while
+  // lame.js is still encoding, but the resulting file must stay labeled.
+  const isNativeNarration = !!(currentVoice && currentVoice.backend === 'cosyvoice3-local');
   setStatus('loading', 'Encoding MP3…', 'The narration is being compressed on this computer.');
   exportMp3Button.disabled = true;
   const encoder = new Worker('mp3-worker.js');
@@ -1390,7 +1393,7 @@ function exportMp3() {
       refreshNarrationInfo();
       return;
     }
-    const mp3Parts = currentVoice && currentVoice.backend === 'cosyvoice3-local'
+    const mp3Parts = isNativeNarration
       ? window.ReadAloudProvenance.markMp3(msg.chunks) : msg.chunks;
     void saveOrDownload('audio', 'read-aloud-narration.mp3', new Blob(mp3Parts, {type: 'audio/mpeg'}), 'MP3 exported');
     maybeExportLabels(labels);
