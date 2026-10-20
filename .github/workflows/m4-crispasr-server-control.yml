@@ -33,7 +33,9 @@ jobs:
             throw "Windows .NET Framework C# compiler not found"
           }
           New-Item -ItemType Directory -Force -Path "build/server-control" | Out-Null
-          & $compiler /nologo /target:winexe /platform:anycpu /optimize+ "/out:build/server-control/CrispASR Server Control.exe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "tools/crispasr-server-control/Program.cs"
+          $sourcePath = (Resolve-Path "tools/crispasr-server-control/Program.cs").Path
+          $outputPath = Join-Path (Get-Location).Path 'build\server-control\CrispASR Server Control.exe'
+          & $compiler /nologo /target:winexe /platform:anycpu /optimize+ "/out:$outputPath" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "$sourcePath"
           if ($LASTEXITCODE -ne 0) { throw "Compilation failed with exit code $LASTEXITCODE" }
           Copy-Item "tools/crispasr-server-control/README.md" "build/server-control/README.md"
           Copy-Item "tools/crispasr-server-control/Program.cs" "build/server-control/Program.cs"
