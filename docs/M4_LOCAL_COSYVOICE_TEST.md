@@ -91,25 +91,36 @@ If the server is absent, the checkbox is unchecked, or model inference fails,
 the original portable voices remain selectable. Unchecking rights removes the
 experimental voice and returns to a portable voice.
 
-### Capitalization test (CosyVoice only)
+### Capitalization test (native CrispASR / CosyVoice only)
 
-New experimental normalization sends ordinary ALL-CAPS words to the
-native voice in lowercase without changing the editor or Amy/Lessac.
-For example: `HEY!` becomes `hey!`, `STOP` becomes `stop`, and
-`NASA` becomes `nasa`. Common spelled initialisms such as `FBI`,
-`USB`, `AI` and `CPU` are kept uppercase.
+The user requested a simpler capitalization rule. In the experimental
+**CosyVoice worker only**, ALL-CAPS words that contain two or more letters
+are converted to **first letter uppercase, remainder lowercase** before
+being sent to CrispASR for speech. Nothing in the editor is rewritten.
+The normal Amy and Lessac voices are **untouched**.
 
-The user reported `HEY` being spelled "H E Y" and invented uppercase
-words being spelled out. Lowercasing invented words such as `ADFASDFA`
-may help but cannot guarantee intelligible pronunciation. Uppercase
-contractions like `DON'T` and `I'M` are also normalized for speech.
-Unusual acronyms can use the existing pronunciation dictionary, e.g.
-`"XYZ":"X Y Z"` to spell out letters explicitly.
+- `HEY!` becomes `Hey!`, `STOP RIGHT THERE!` becomes `Stop Right There!`.
+- `FAFAFAFAD` becomes `Fafafafad` (letters are not changed or reordered).
+  Unfamiliar invented words still have no guaranteed pronunciation.
+- `NASA` becomes `Nasa`, and **undotted** `FBI` becomes `Fbi`.
+- To request spoken initials, type periods between letters:
+  `F.B.I.`, `U.S.A.`, `A.I.`. These are forwarded unchanged.
+- `DON'T` becomes `Don't`, `I'M` becomes `I'm`; existing mixed-case
+  words, punctuation and normal sentences are left untouched.
 
-**Live acceptance still required:** install the updated GitHub overlay in
-the isolated M4 test copy, keep CrispASR running, test
-`HEY! STOP RIGHT THERE! NASA and FBI.`, and confirm that Amy/Lessac
-still work. Only mock regression tests run in GitHub CI.
+This replaces the earlier experimental list of protected acronyms.
+Existing pronunciation-dictionary overrides still apply first.
+The transformation is applied only when submitting a CosyVoice native
+request; displayed text, highlight positions, labels, and the
+Amy/Lessac workers stay exactly as before.
+
+**Manual acceptance test:** leave the CrispASR Git Bash server running;
+install the latest successful GitHub M4 overlay into the separate **M4
+test copy**, restart Read-Aloud, then listen to:
+`HEY! STOP RIGHT THERE! F.B.I. is here.`
+Check that ordinary words are spoken rather than spelled, dotted initials
+remain initials, and Amy and Lessac remain unchanged. Mock tests cannot
+prove that the model will pronounce every word correctly.
 
 ## 4. Important limitations
 

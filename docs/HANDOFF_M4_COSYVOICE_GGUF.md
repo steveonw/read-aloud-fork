@@ -3,7 +3,7 @@
 **Updated:** 2026-10-19, late evening (US Eastern; user evidence posted 2026-10-20 UTC)  
 **Repository:** [steveonw/read-aloud-fork](https://github.com/steveonw/read-aloud-fork)  
 **Current work:** [Issue #8](https://github.com/steveonw/read-aloud-fork/issues/8) / [DRAFT PR #9](https://github.com/steveonw/read-aloud-fork/pull/9) (`m4/local-cosyvoice-bridge`)  
-**Resume point:** M4b clean narration has now been confirmed in the user's two-sentence Windows MP3, without the repeated AI announcement. New M4c issue: CosyVoice spells ordinary ALL-CAPS words as initials (user: `HEY` became H E Y; also random `ADFASDFA`), unlike Amy/Lessac. A CosyVoice-only uppercase normalization patch is in draft PR #9, pending real audio retest. Preserve the original USB and `main`. The separate 5/37 integrity warning remains under investigation.
+**Resume point:** The native CrispASR/CosyVoice 3 GGUF engine, Go bridge, Read-Aloud and clean two-sentence MP3 were verified working on the user's Windows i5-2400 + GTX 1650. The repeated spoken AI announcement is resolved in the session-only Narration Mode. User then reported ALL-CAPS pronunciation (`HEY` spelled H E Y). The newest experimental fix applies **only in the CosyVoice worker**: ordinary ALL-CAPS words are converted to first-letter uppercase (`HEY` → `Hey`, `FAFAFAFAD` → `Fafafafad`), while dotted initials (`F.B.I.`) remain untouched. No acronym allowlist; the previous approach was superseded at the user's request. Await new Windows audio listening verification; don't modify the working original USB or `main`, and keep the PR draft. The unrelated 5/37 integrity warning still needs checking.
 
 This is the latest handoff. The [earlier M3 handoff](https://github.com/steveonw/read-aloud-fork/blob/m3/gguf-legacy-cuda/docs/HANDOFF_COSYVOICE_GGUF.md) records the complete legacy-CPU build and the successful standalone audio test.
 
@@ -19,29 +19,35 @@ The browser stitches native speech into new WAV/MP3 files, losing native signed 
 
 **GitHub verification:** successful [M4 Windows test-kit build + Node/Go contract tests](https://github.com/steveonw/read-aloud-fork/actions/runs/39358205181) and successful [core regression](https://github.com/steveonw/read-aloud-fork/actions/runs/39358205111) on the first M4b implementation commit `b22d35e`. Follow-up MP3-mode metadata race fix is in progress. **This note is historical: the later M4b Windows MP3 did verify clean speech.** Leave PR #9 draft until that test and review.
 
-### Newest checkpoint: Windows acceptance and capitalization (2026-10-19 evening)
+### Newest checkpoint: M4b accepted; simplified M4c speech capitalization in progress
 
-- M4b's new exported `read-aloud-narration(3).mp3` spoke two
-  sentences: "The storm was coming. The road was empty." **The
-  repeated spoken AI announcement was absent**, confirming the
-  session-only clean narration flow on real user hardware.
-  AI-generated MP3 metadata was present (ordinary, not signed C2PA).
-- User reports that `HEY` is pronounced letter by letter, "H E Y",
-  and other ALL-CAPS text such as `ADFASDFA` is spelled. Amy and
-  Lessac do not exhibit this issue. Root cause is **suspected**, not
-  measured inside CrispASR; Read-Aloud previously passed uppercase
-  text unchanged into the native worker and Go proxy.
-- Experimental M4c workaround is limited to `web/cosyvoice-local.worker.js`:
-  lowercase ordinary uppercase words only for native speech, preserve
-  well-known spoken initials like `FBI`, `USB`, `CPU`, `AI`; lower
-  `NASA` as a spoken word; normalize `DON'T` and `I'M` sensibly.
-  The draft, highlighting, sentence text labels, and Amy/Lessac workers
-  are untouched. The existing pronunciation dictionary remains available
-  for special cases. Novel nonsense strings may still be mispronounced.
-- Next test: wait for the latest M4 Windows CI build, overlay **only
-  the separate test copy**, keep the working CrispASR Git Bash engine
-  running, and listen to `HEY! STOP RIGHT THERE! NASA and FBI.`.
-  Do not call uppercase behavior fixed on hardware until confirmed.
+- User provided `read-aloud-narration(3).mp3` after checking Narration Mode:
+  "The storm was coming. The road was empty." The repeated AI
+  announcement was absent. Plain AI-generated MP3 metadata was present;
+  it was not a signed C2PA export. See [the PR acceptance note](https://github.com/steveonw/read-aloud-fork/pull/9#issuecomment-6281949216).
+- The user noticed native CosyVoice was spelling ALL-CAPS words (e.g.
+  `HEY` as H E Y), unlike the original Amy and Lessac voices.
+  The native implementation's text-normalization path may differ from
+  the original Python model; that causal diagnosis is not yet proven.
+- The first M4c patch used an uppercase acronym exception list, but the
+  user requested a **simpler rule restricted to CrispASR/CosyVoice**:
+  title-case every unpunctuated uppercase word and leave dotted initials
+  unchanged. Current experimental worker now sends `HEY` as `Hey`,
+  `FAFAFAFAD` as `Fafafafad`, `FBI` as `Fbi`, but leaves
+  `F.B.I.` unchanged. Uppercase contractions such as `DON'T` and
+  `I'M` remain readable. There is **no acronym allowlist**.
+- **Only `web/cosyvoice-local.worker.js` carries this speech-only
+  transformation.** The editor, highlighted spans, text labels, Go
+  proxy, and original Amy/Lessac workers are unchanged. The existing
+  voice-consent check, default spoken disclosure, optional Narration
+  Mode and watermark stay intact.
+- After the latest green GitHub M4 test-kit build, install the new
+  overlay only in the isolated M4 test copy (never the original USB).
+  Keep Git Bash CrispASR running and listen to
+  `HEY! STOP RIGHT THERE! F.B.I. is here.`. Only the actual user's
+  MP3 can verify whether the model speaks this wording correctly.
+  Spelling out `F.B.I.` is a model-language behavior to confirm, not
+  something the regex itself guarantees.
 
 ### Confirmed on the actual user machine
 
@@ -176,7 +182,25 @@ A second possibility: the test-copy `START - WINDOWS.exe` wasn't overlaid correc
 
 ## 7. Copy/paste summary for another conversation
 
-> Resume M4 for `steveonw/read-aloud-fork`, **Issue #8**, on **draft PR #9** branch `m4/local-cosyvoice-bridge` (do NOT merge or modify app code without new approval). User's Windows **i5-2400** (no AVX2) + **GTX 1650 4GB** runs custom CrispASR **v0.8.43** native GGUF CUDA build from draft PR #7. Python CosyVoice pilot was cleaned up; native build, model cache and known-good WAV are backed up. **Latest VERIFIED breakthrough on 2026-10-19 evening:** M4 Read-Aloud displays **CosyVoice 3 GGUF — English is ready**, English voice selected, and user supplied a **multi-sentence MP3 exported through Read-Aloud** plus native server logs with many successful WAV syntheses at 24 kHz. Therefore the old 404 / wrong launcher / generic `--voice-dir` warning are **not the current blocking issue**. Main blocker: CrispASR logs `spoken_disclaimer=yes` and repeats **"This audio was generated by artificial intelligence"** **before every sentence**, making continuous narration unusable. Design a consent-aware, appropriately attested **project-level disclosure/provenance** flow; review upstream rules before any per-request `spoken_disclaimer=false`, preserve watermark/C2PA, never silently strip audio. Secondary warning: **5 of 37 USB files fail integrity check** after five-file M4 overlay, suspected stale `SHA256SUMS.txt`; identify exact paths, do not simply delete manifest. Working Amy/F8 was previously reported, original USB remains untouched. Desired later features: stable alternate takes, lock audio, export, acting direction. **User later authorized implementing opt-in narration mode on draft PR #9; GitHub CI passed, actual Windows retest pending. No original USB/main changes or PR merge.** GitHub connector already works as `steveonw` with repository write access, so no extra token is required. Read **Section 0** of `docs/HANDOFF_M4_COSYVOICE_GGUF.md` first.
+> Continue Issue #8 / draft PR #9 `m4/local-cosyvoice-bridge` in
+> `steveonw/read-aloud-fork`. User's Win64 i5-2400 (no AVX2) + GTX 1650
+> runs custom CrispASR v0.8.43 GGUF CosyVoice3 CUDA binary from
+> `~/crispasr-gguf-legacy`; existing server on 127.0.0.1:18080 works.
+> Read-Aloud Go server at 127.0.0.1:17391 (or auto-assigned port)
+> forwards sentence requests. M4b session-only Narration Mode successfully
+> eliminated the repeated AI voice announcement on user's real
+> two-sentence MP3, while native watermark and unsigned metadata remain.
+> Latest issue: all-uppercase `HEY` is spelled H E Y. **User explicitly
+> requested a simple rule for only the CrispASR voice**: title-case
+> unpunctuated uppercase words (`HEY` → `Hey`; `FAFAFAFAD` →
+> `Fafafafad`) and keep dotted initials `F.B.I.` unchanged.
+> The earlier hard-coded acronym exception list has been removed from the
+> native worker. Amy/Lessac, original editor text, labels, highlights,
+> user USB installation and main branch MUST remain untouched.
+> Await new M4 Windows CI and the user's listening test. There is still a
+> separate USB integrity warning 5 of 37 files; investigate file hashes
+> before changing manifest. Never reinstall models/Python or merge draft
+> PR #9 without the user's explicit go-ahead.
 
 ## Links
 

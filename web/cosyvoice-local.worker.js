@@ -11,27 +11,16 @@ let consentAttestation = '';
 let chosenVoice = 'fleurs-en';
 let projectDisclosure = false;
 
-// CosyVoice's text front-end can treat ALL-CAPS words as sequences of
-// initials ("HEY" -> "H E Y"), unlike the existing Amy/Lessac WASM voices.
-// Normalize only the text delivered to this native voice. The user's draft,
-// displayed highlights, written labels and other voice backends stay intact.
-// Preserve common initialisms whose letters should actually be spoken;
-// project-specific exceptions can still be specified with the existing
-// pronunciation dictionary (e.g. "XYZ" -> "X Y Z").
-const COSYVOICE_INITIALISMS = new Set([
-  'AI', 'API', 'ASR', 'BBC', 'CCTV', 'CIA', 'CPU', 'CSS', 'DNA', 'DVD',
-  'EU', 'FBI', 'GPU', 'GGUF', 'HD', 'HQ', 'HTML', 'HTTP', 'HTTPS',
-  'ID', 'IP', 'LED', 'MP', 'MRI', 'NHS', 'OK', 'PDF', 'RAM', 'RGB',
-  'RNA', 'ROM', 'SSD', 'TTS', 'TV', 'UK', 'UN', 'USA', 'USB',
-  'URL', 'VR', 'WAV'
-]);
-
+// CosyVoice/CrispASR may spell ALL-CAPS words as individual letters.
+// Only the native CosyVoice worker changes its *spoken request* text; the
+// original draft, sentence labels, highlights and Amy/Lessac stay unchanged.
+// Treat undotted ALL-CAPS words as ordinary title-case words. To request
+// spelled initials, use periods between letters: F.B.I. stays F.B.I.
+// Keep a complete uppercase contraction together (DON'T -> Don't,
+// I'M -> I'm) instead of accidentally creating Don'T or I'M.
 function normalizeCosyVoiceSpokenText(text) {
-  return String(text || '').replace(/\b(?:I['’][A-Z]+|[A-Z]{2,}(?:['’][A-Z]+)*)\b/g, token => {
-    if (COSYVOICE_INITIALISMS.has(token)) return token;
-    if (/^I['’]/.test(token)) return 'I' + token.slice(1).toLowerCase();
-    return token.toLowerCase();
-  });
+  return String(text || '').replace(/\b(?:[A-Z]{2,}(?:['’][A-Z]+)*|I['’][A-Z]+)\b/g,
+    token => token[0] + token.slice(1).toLowerCase());
 }
 
 function decodeMonoPCM16Wav(buffer) {

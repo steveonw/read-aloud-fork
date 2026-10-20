@@ -118,19 +118,27 @@ const msg=async data=>await self.onmessage({data});
   assert.equal(cleanBody.projectDisclosure,true);
   assert.ok(!('marking_attestation' in cleanBody) && !('spoken_disclaimer' in cleanBody));
 
-  // The native engine tends to spell all-uppercase text. Fix audible text
-  // while preserving true initialisms, mixed case, punctuation and contractions.
-  const capitals = "HEY! STOP RIGHT THERE! ADFASDFA NASA FBI USB AI PDF. DON'T MOVE! I'M HERE. U.S.A. is a country.";
+  // Only the native worker reformats ALL-CAPS words for audio; the
+  // draft and other (Amy/Lessac) workers are never changed.
+  // Letter-by-letter pronunciation is requested with dotted initials.
+  const capitals = "HEY! STOP RIGHT THERE! FAFAFAFAD NASA FBI F.B.I. A.I. DON'T MOVE! I'M HERE. U.S.A. is a country. The mixedCase name stays.";
   await cleanMessage({type:'generate',id:100,text:capitals,speed:1});
   assert.equal(cleanEvents.at(-1).type,'tts-result');
   const lastSpeech = cleanCalls.filter(x=>x.url.endsWith('/speech')).at(-1);
   const capitalBody = JSON.parse(lastSpeech.options.body);
   assert.equal(capitalBody.input,
-    "hey! stop right there! adfasdfa nasa FBI USB AI PDF. don't move! I'm here. U.S.A. is a country.");
+    "Hey! Stop Right There! Fafafafad Nasa Fbi F.B.I. A.I. Don't Move! I'm Here. U.S.A. is a country. The mixedCase name stays.");
   assert.equal(capitalBody.projectDisclosure,true);
-  assert.equal(capitals.startsWith('HEY!'),true,'draft text remains unchanged');
+  assert.ok(capitals.startsWith('HEY!'), 'draft text is still uppercase');
 
-  // Case selection cannot affect default/other worker backends because the
-  // transformation lives in CosyVoice's own worker, not the editor pipeline.
-  console.log('COSYVOICE WORKER: capitals, initialisms, native narration and WAV checks passed');
+  // More focused regression inputs: periods denote initials and mixed-case
+  // names and normal text must be retained byte-for-byte in the speech API.
+  const probe = "F.B.I. U.S.B. HEY! ABC ABC's MIXED. NoChange iPhone.";
+  await cleanMessage({type:'generate',id:101,text:probe,speed:1});
+  assert.equal(cleanEvents.at(-1).type,'tts-result');
+  const probeBody = JSON.parse(cleanCalls.filter(x=>x.url.endsWith('/speech')).at(-1).options.body);
+  assert.equal(probeBody.input, "F.B.I. U.S.B. Hey! Abc Abc's Mixed. NoChange iPhone.");
+  assert.equal(probeBody.voice,'fleurs-en');
+
+  console.log('COSYVOICE WORKER: title-casing only native speech, dotted initialisms, narration and WAV checks passed');
 })().catch(err=>{console.error(err);process.exitCode=1;});
