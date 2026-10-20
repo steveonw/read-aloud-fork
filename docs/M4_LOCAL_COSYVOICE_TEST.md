@@ -91,6 +91,26 @@ If the server is absent, the checkbox is unchecked, or model inference fails,
 the original portable voices remain selectable. Unchecking rights removes the
 experimental voice and returns to a portable voice.
 
+### Capitalization test (CosyVoice only)
+
+New experimental normalization sends ordinary ALL-CAPS words to the
+native voice in lowercase without changing the editor or Amy/Lessac.
+For example: `HEY!` becomes `hey!`, `STOP` becomes `stop`, and
+`NASA` becomes `nasa`. Common spelled initialisms such as `FBI`,
+`USB`, `AI` and `CPU` are kept uppercase.
+
+The user reported `HEY` being spelled "H E Y" and invented uppercase
+words being spelled out. Lowercasing invented words such as `ADFASDFA`
+may help but cannot guarantee intelligible pronunciation. Uppercase
+contractions like `DON'T` and `I'M` are also normalized for speech.
+Unusual acronyms can use the existing pronunciation dictionary, e.g.
+`"XYZ":"X Y Z"` to spell out letters explicitly.
+
+**Live acceptance still required:** install the updated GitHub overlay in
+the isolated M4 test copy, keep CrispASR running, test
+`HEY! STOP RIGHT THERE! NASA and FBI.`, and confirm that Amy/Lessac
+still work. Only mock regression tests run in GitHub CI.
+
 ## 4. Important limitations
 
 - **A separate native terminal is required for now**. Automatic CrispASR

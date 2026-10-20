@@ -11,6 +11,29 @@ let consentAttestation = '';
 let chosenVoice = 'fleurs-en';
 let projectDisclosure = false;
 
+// CosyVoice's text front-end can treat ALL-CAPS words as sequences of
+// initials ("HEY" -> "H E Y"), unlike the existing Amy/Lessac WASM voices.
+// Normalize only the text delivered to this native voice. The user's draft,
+// displayed highlights, written labels and other voice backends stay intact.
+// Preserve common initialisms whose letters should actually be spoken;
+// project-specific exceptions can still be specified with the existing
+// pronunciation dictionary (e.g. "XYZ" -> "X Y Z").
+const COSYVOICE_INITIALISMS = new Set([
+  'AI', 'API', 'ASR', 'BBC', 'CCTV', 'CIA', 'CPU', 'CSS', 'DNA', 'DVD',
+  'EU', 'FBI', 'GPU', 'GGUF', 'HD', 'HQ', 'HTML', 'HTTP', 'HTTPS',
+  'ID', 'IP', 'LED', 'MP', 'MRI', 'NHS', 'OK', 'PDF', 'RAM', 'RGB',
+  'RNA', 'ROM', 'SSD', 'TTS', 'TV', 'UK', 'UN', 'USA', 'USB',
+  'URL', 'VR', 'WAV'
+]);
+
+function normalizeCosyVoiceSpokenText(text) {
+  return String(text || '').replace(/\b(?:I['’][A-Z]+|[A-Z]{2,}(?:['’][A-Z]+)*)\b/g, token => {
+    if (COSYVOICE_INITIALISMS.has(token)) return token;
+    if (/^I['’]/.test(token)) return 'I' + token.slice(1).toLowerCase();
+    return token.toLowerCase();
+  });
+}
+
 function decodeMonoPCM16Wav(buffer) {
   if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 44 || buffer.byteLength > (16 << 20)) {
     throw new Error('The local engine returned an invalid WAV size.');
@@ -106,7 +129,7 @@ self.onmessage = async (event) => {
       credentials:'same-origin',
       headers:{'Content-Type':'application/json','X-RA-Token':apiToken},
       body:JSON.stringify({
-        input:String(msg.text || ''),
+        input:normalizeCosyVoiceSpokenText(msg.text),
         voice:chosenVoice,
         speed:Number(msg.speed),
         consentAttestation,

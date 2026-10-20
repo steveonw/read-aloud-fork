@@ -117,5 +117,20 @@ const msg=async data=>await self.onmessage({data});
   const cleanBody = JSON.parse(cleanCalls.find(x=>x.url.endsWith('/speech')).options.body);
   assert.equal(cleanBody.projectDisclosure,true);
   assert.ok(!('marking_attestation' in cleanBody) && !('spoken_disclaimer' in cleanBody));
-  console.log('COSYVOICE WORKER: default disclosure, explicit narration mode, WAV and safety checks passed');
+
+  // The native engine tends to spell all-uppercase text. Fix audible text
+  // while preserving true initialisms, mixed case, punctuation and contractions.
+  const capitals = "HEY! STOP RIGHT THERE! ADFASDFA NASA FBI USB AI PDF. DON'T MOVE! I'M HERE. U.S.A. is a country.";
+  await cleanMessage({type:'generate',id:100,text:capitals,speed:1});
+  assert.equal(cleanEvents.at(-1).type,'tts-result');
+  const lastSpeech = cleanCalls.filter(x=>x.url.endsWith('/speech')).at(-1);
+  const capitalBody = JSON.parse(lastSpeech.options.body);
+  assert.equal(capitalBody.input,
+    "hey! stop right there! adfasdfa nasa FBI USB AI PDF. don't move! I'm here. U.S.A. is a country.");
+  assert.equal(capitalBody.projectDisclosure,true);
+  assert.equal(capitals.startsWith('HEY!'),true,'draft text remains unchanged');
+
+  // Case selection cannot affect default/other worker backends because the
+  // transformation lives in CosyVoice's own worker, not the editor pipeline.
+  console.log('COSYVOICE WORKER: capitals, initialisms, native narration and WAV checks passed');
 })().catch(err=>{console.error(err);process.exitCode=1;});
