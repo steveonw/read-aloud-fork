@@ -1,7 +1,7 @@
 # Read-Aloud AI Narration — current handoff and next steps
 
 **Updated:** 2026-10-22  
-**Status:** CosyVoice integration working; **Qwen3-TTS CustomVoice direct emotion-WAV test now succeeded on GTX 1650**. Next goal is optional Qwen integration and paragraph/scene acting, preserving existing sentences. **Do not merge PR #9 yet.**  
+**Status:** Experimental Qwen3-TTS Speaker/Acting controls now built and **first five-scene MP3 auditioned on Windows**; voice/delivery transitions sound promising, with a rough screamed word needing polish. The per-sentence pipeline remains. Further acceptance tests are pending. **Do not merge PR #9 yet.**  
 **Repository:** https://github.com/steveonw/read-aloud-fork  
 **Issue:** https://github.com/steveonw/read-aloud-fork/issues/8  
 **Draft PR:** https://github.com/steveonw/read-aloud-fork/pull/9  
@@ -9,11 +9,29 @@
 **Stable original:** https://github.com/steveonw/Read-Aloud-Main  
 **Engineering history:** [HANDOFF_M4_COSYVOICE_GGUF.md](HANDOFF_M4_COSYVOICE_GGUF.md)
 
+## User's first M4e Speaker + Acting MP3 acceptance test (2026-10-22)
+
+**Source:** user uploaded `read-aloud-narration(6).mp3` in ChatGPT (NOT committed to GitHub) after running the five-scene script supplied for the experimental Qwen3-TTS integration. The MP3 is **26.448 seconds, 24 kHz mono** (64 kb/s encoding). The supplied audio/transcription reaches the final natural narrator sentence; **no Unicode direction markers were spoken**.
+
+The script used five blocks, each as its own sentence with inherited independent directives:
+
+1. `speaker=vivian`, acting "Whispering in terror, breathless, trying not to be heard." — "James, don't move. He's standing right outside the door."
+2. `speaker=ryan`, **no acting change** — "I can hear his footsteps getting closer. What are we going to do?"
+3. `speaker=vivian`, acting "Suddenly screaming in absolute horror, voice cracking with panic." — "JAMES! RUN! HE'S COMING!"
+4. **same Vivian**, acting "Crying with happiness, laughing uncontrollably through tears of relief." — "Oh, thank God you're alive! I thought I'd lost you forever!"
+5. `acting=auto` **only** — "The hallway fell silent, and the old clock continued ticking as though nothing had happened."
+
+**Review:** The James sentence is audibly a much lower male-sounding voice compared with Vivian, consistent with a successful Ryan switch **while retaining the frightened delivery**. The switch back to Vivian and acting changes are audible: panicked/intense screaming, then relieved emotional delivery, then comparatively neutral storytelling. The screaming line's **"RUN!"** becomes elongated/warbled and less intelligible; first-line "whisper" is also more emphatic than purely whispered, and "happy crying" conveys relief more consistently than literal laughter/sobbing. These are voice-model/performance quality issues to iterate, not evidence of marker-parsing failure. No sample peaks near digital clipping in the MP3.
+
+**Limits of this evidence:** The recording supports correct order of different-sounding voices and directions and omission of markers, but **does not independently verify native `spk_id` for Ryan**, or F8-from-middle, safe cache invalidation, timing-label alignment, or durable locked takes. The last behaviors still require separate testing. Do not claim full feature sign-off. The test was performed against the experimental copy and the original stable program remains intact.
+
+**Smallest next quality A/B test:** re-render only the screaming sentence with **"James! Run! He's coming!"** instead of all uppercase, leaving Vivian and the acting direction unchanged. Compare whether `Run` articulates better without losing the intense emotion. Prefer a targeted per-sentence audition over applying global uppercase normalization prematurely. Retain working Qwen and CosyVoice as a fallback. No code changes were needed to review this MP3.
+
 ## New experimental implementation checkpoint — Speaker and Acting controls (2026-10-22)
 
 A **new M4e experimental code change** was prepared for the draft PR: separate visible **Insert Speaker** and **Insert Acting** buttons, a freeform acting text field and optional examples, plus a **Reset acting** control. The script stores standalone Unicode `⟦speaker=...⟧`, `⟦acting="..."⟧`, `⟦acting=auto⟧` lines. Speaker and emotion persist independently: a new speaker inherits the existing fear, and a new emotion keeps the current speaker. Invalid markers are skipped and reported. No directives are spoken; F8-from-cursor uses preceding state; the existing per-sentence timing, exports and in-memory cache are preserved. Qwen speaker plus instruction are included in the sentence cache identity.
 
-Qwen is offered only after a successful local `/api/tts/qwen/status` discovery; backend remains a **separate optional bridge** from the tested CosyVoice path. Go requests use fixed localhost port 18080, validate speaker presets and length, and do not allow arbitrary paths, remote URLs, watermark opt-outs or forged disclosure fields. The first integration retains Vivian as the startup preset and forwards changes to the other known Qwen speaker names per sentence. **Per-request speaker switching on the user's actual server is still to be tested**, as is the complete updated browser experience on Windows; do not present those as field-confirmed yet. Automated Go/Node tests and Windows overlay CI are designed to run before the next human test. No persistent take vault or paragraph-alignment feature has been added.
+Qwen is offered only after a successful local `/api/tts/qwen/status` discovery; backend remains a **separate optional bridge** from the tested CosyVoice path. Go requests use fixed localhost port 18080, validate speaker presets and length, and do not allow arbitrary paths, remote URLs, watermark opt-outs or forged disclosure fields. The first integration retains Vivian as the startup preset and forwards changes to the other known Qwen speaker names per sentence. **At the time of this implementation checkpoint, per-request speaker switching and the updated browser experience had not yet been user-tested.** The later MP3 acceptance test above provides strong audible evidence of those features, though it does not independently verify the native Ryan speaker ID. Automated Go/Node tests and Windows overlay CI are designed to run before the next human test. No persistent take vault or paragraph-alignment feature has been added.
 
 See [M4 test guide](M4_LOCAL_COSYVOICE_TEST.md) for the test sequence; retain CosyVoice as fallback, Amy/Lessac as default proofreading voices, and both original USB and `main` untouched.
 
