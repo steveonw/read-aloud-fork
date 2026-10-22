@@ -63,7 +63,7 @@ check(middle.map(x=>[x.speaker,x.acting]),[
 const altered=script.replace('Screaming in horror','Screaming in joy');
 const changed=seg(altered);
 assert.equal(all[0].key,changed[0].key,'unchanged earlier recordings must remain cache hits');
-assert.equal(all[2].key,changed[2].key,'other speaker's recordings must remain cache hits');
+assert.equal(all[2].key,changed[2].key,"other speaker recordings must remain cache hits");
 assert.notEqual(all[3].key,changed[3].key,'the edited acting direction must change the affected cache key');
 assert.equal(all[4].key,changed[4].key,'reset acting must retain the later recording');
 const bad='Normal.\n⟦speaker=../../bad.wav⟧\nStill normal.\n⟦acting="not valid\nEnding.';
