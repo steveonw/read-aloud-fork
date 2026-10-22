@@ -280,6 +280,9 @@ function startVoice(voice) {
   }
   renderSpeakerSelect();
   renderDeliveryToggle();
+  // Do not clutter the default proofreader; reveal script tools when the
+  // user intentionally selects the expressive Qwen engine.
+  if (voice.backend === 'qwen3-local') document.getElementById('scriptDirectionPanel').open = true;
   ready = false;
   armLoadWatchdog();
   // M1: use the shared worker contract; WASM remains the default provider.
