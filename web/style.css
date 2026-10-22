@@ -179,6 +179,56 @@ textarea:focus {
   font-size: 0.88rem;
 }
 
+/* Optional script direction authoring, kept outside the normal proofreading UI. */
+.script-direction-panel {
+  margin-top: 12px;
+  border: 1px solid #d5dced;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: rgba(232, 237, 251, 0.45);
+}
+.script-direction-panel summary {
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #39445d;
+}
+.script-help, .script-direction-status {
+  font-size: 0.81rem;
+  line-height: 1.5;
+  color: #53627e;
+}
+.script-direction-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(220px, 2fr);
+  gap: 14px;
+}
+.script-direction-field { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.script-direction-field label { color: #344059; font-weight: 700; font-size: 0.81rem; }
+.script-direction-field select, .script-direction-field input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #b8c2d8;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font: inherit;
+  background: #fff;
+  color: #182038;
+}
+.script-direction-field button { padding: 9px 12px; font-size: 0.84rem; }
+.script-direction-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.script-direction-actions .quiet { border: 1px solid #bac4dd; }
+@media (max-width: 660px) {
+  .script-direction-grid { grid-template-columns: 1fr; }
+}
+:root[data-theme="dark"] .script-direction-panel { background: #19243b; border-color: #39465e; }
+:root[data-theme="dark"] .script-direction-panel summary,
+:root[data-theme="dark"] .script-direction-field label { color: #e3e8f7; }
+:root[data-theme="dark"] .script-help,
+:root[data-theme="dark"] .script-direction-status { color: #b7c2db; }
+:root[data-theme="dark"] .script-direction-field select,
+:root[data-theme="dark"] .script-direction-field input { background: #10182a; border-color: #41516c; color: #f1f3fb; }
+
 .controls {
   display: flex;
   flex-wrap: wrap;

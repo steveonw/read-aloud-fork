@@ -9,6 +9,14 @@
 **Stable original:** https://github.com/steveonw/Read-Aloud-Main  
 **Engineering history:** [HANDOFF_M4_COSYVOICE_GGUF.md](HANDOFF_M4_COSYVOICE_GGUF.md)
 
+## New experimental implementation checkpoint — Speaker and Acting controls (2026-10-22)
+
+A **new M4e experimental code change** was prepared for the draft PR: separate visible **Insert Speaker** and **Insert Acting** buttons, a freeform acting text field and optional examples, plus a **Reset acting** control. The script stores standalone Unicode `⟦speaker=...⟧`, `⟦acting="..."⟧`, `⟦acting=auto⟧` lines. Speaker and emotion persist independently: a new speaker inherits the existing fear, and a new emotion keeps the current speaker. Invalid markers are skipped and reported. No directives are spoken; F8-from-cursor uses preceding state; the existing per-sentence timing, exports and in-memory cache are preserved. Qwen speaker plus instruction are included in the sentence cache identity.
+
+Qwen is offered only after a successful local `/api/tts/qwen/status` discovery; backend remains a **separate optional bridge** from the tested CosyVoice path. Go requests use fixed localhost port 18080, validate speaker presets and length, and do not allow arbitrary paths, remote URLs, watermark opt-outs or forged disclosure fields. The first integration retains Vivian as the startup preset and forwards changes to the other known Qwen speaker names per sentence. **Per-request speaker switching on the user's actual server is still to be tested**, as is the complete updated browser experience on Windows; do not present those as field-confirmed yet. Automated Go/Node tests and Windows overlay CI are designed to run before the next human test. No persistent take vault or paragraph-alignment feature has been added.
+
+See [M4 test guide](M4_LOCAL_COSYVOICE_TEST.md) for the test sequence; retain CosyVoice as fallback, Amy/Lessac as default proofreading voices, and both original USB and `main` untouched.
+
 ## Current milestone — 2026-10-22: Qwen3-TTS acting instructions work in first real Windows WAV test
 
 The user **successfully started the existing custom CrispASR v0.8.43 CPU+CUDA executable** as a separate local server with:

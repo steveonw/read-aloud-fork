@@ -80,3 +80,34 @@ A short real MP3 confirmed that **HEY** and **STOP RIGHT THERE** are now spoken 
 - [CrispASR native server API](https://github.com/CrispStrobe/CrispASR/blob/v0.8.43/docs/server.md)
 
 **Leave the original working Read-Aloud USB copy, native CrispASR binaries, model cache and `main` branch unchanged.**
+
+## Experimental Qwen3-TTS speaker + acting script directions (M4e)
+
+This is **optional** and does not alter the normal Amy / Lessac / Kokoro proofreader. The standalone CrispASR server must be started manually (this controller still starts **CosyVoice** only). First stop CosyVoice on port `18080` if it is running, then start the already downloaded native Qwen model:
+
+```bash
+cd ~/crispasr-gguf-legacy
+./crispasr.exe --server --backend qwen3-tts-1.7b-customvoice -m auto \
+  --voice vivian --host 127.0.0.1 --port 18080
+```
+
+Open the **M4 experimental Read-Aloud overlay**, expand **CosyVoice hardware check (optional)** (the shared local-native section), click **Find local Qwen3-TTS GGUF**, and select **Qwen3-TTS 1.7B CustomVoice** in the Voice dropdown. Expand **Script directions — Speaker & Acting** just below the draft editor. Click **Insert Speaker** for one of Qwen's nine preset speakers, or type any acting direction and click **Insert Acting**. These add UTF-8 lines **above the current cursor line** without replacing prose:
+
+```text
+⟦speaker=vivian⟧
+⟦acting="Terrified, whispering so the killer can't hear"⟧
+Don't move. He's outside.
+⟦speaker=ryan⟧
+I think he saw us!
+⟦speaker=vivian⟧
+⟦acting="Screaming in horror, then breaking into sobs"⟧
+James, no!
+⟦acting=auto⟧
+She sat in silence.
+```
+
+**Speaker and acting are independent and persist** until changed. Only Qwen uses these specific settings; other voices skip valid marker lines. A malformed directive is reported and skipped rather than spoken. A backslash prefix (`\\⟦...`) means literal text, not a directive. **F8 from the middle of the draft inherits directions above it**; F7 and Render / Update still work by sentence and keep their original timings and Audacity labels. Changing a direction changes only affected Qwen sentence cache keys; this test version still uses browser-memory caching and does not promise durable locked takes across restarts.
+
+**Important test limitation:** Vivian (the model started with `--voice vivian`) omits the per-request `voice` field. Other speakers use CrispASR's per-request preset selector. This needs confirmation on the user's exact custom executable; if CrispASR rejects a preset change, Read-Aloud displays an error rather than silently using the wrong voice. The model and native audio watermark remain unchanged; disclose AI narration in finished projects.
+
+This overlay is **not** a full USB installation: apply it only to an isolated copy that already includes the original voice assets. Do not overwrite your working USB copy or merge PR #9 yet.

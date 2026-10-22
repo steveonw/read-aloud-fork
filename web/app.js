@@ -45,6 +45,15 @@ const cosyvoiceRights = document.getElementById('cosyvoiceRights');
 const cosyvoiceProjectDisclosure = document.getElementById('cosyvoiceProjectDisclosure');
 const cosyvoiceCheckButton = document.getElementById('cosyvoiceCheckButton');
 const cosyvoiceLocalStatus = document.getElementById('cosyvoiceLocalStatus');
+const qwenCheckButton = document.getElementById('qwenCheckButton');
+const qwenLocalStatus = document.getElementById('qwenLocalStatus');
+const scriptSpeakerSelect = document.getElementById('scriptSpeakerSelect');
+const scriptActingPreset = document.getElementById('scriptActingPreset');
+const scriptActingText = document.getElementById('scriptActingText');
+const scriptSpeakerButton = document.getElementById('scriptSpeakerButton');
+const scriptActingButton = document.getElementById('scriptActingButton');
+const scriptActingReset = document.getElementById('scriptActingReset');
+const scriptDirectionStatus = document.getElementById('scriptDirectionStatus');
 const speakerRow = document.getElementById('speakerRow');
 const speakerSelect = document.getElementById('speakerSelect');
 const volume = document.getElementById('volume');
@@ -388,6 +397,38 @@ async function discoverLocalCosyVoice() {
   }
 }
 
+// Local Qwen3-TTS is opt-in. It is not downloaded or started by the browser.
+async function discoverLocalQwen() {
+  if (openedDirectly) {
+    qwenLocalStatus.textContent = 'Open Read-Aloud through its local START launcher.';
+    return;
+  }
+  qwenCheckButton.disabled = true;
+  qwenLocalStatus.textContent = 'Checking Qwen3-TTS on 127.0.0.1:18080…';
+  try {
+    const res = await fetch('/api/tts/qwen/status',{cache:'no-store'});
+    if (!res.ok) throw new Error('The local launcher has no Qwen connector. Update the M4 test copy.');
+    const status = await res.json();
+    if (status.state !== 'ready') {
+      qwenLocalStatus.textContent = String(status.message || 'Local Qwen is unavailable.');
+      return;
+    }
+    if (!voiceCatalog.some(v => v.id === 'qwen3-1.7b-customvoice')) {
+      voiceCatalog.push({
+        id:'qwen3-1.7b-customvoice',name:'Qwen3-TTS 1.7B CustomVoice',
+        quality:'experimental',backend:'qwen3-local',architecture:'qwen3-tts',
+        nativeVoice:'vivian',lockedSpeaker:true
+      });
+      renderVoiceSelect();
+    }
+    qwenLocalStatus.textContent = 'Qwen is ready. Select it under Voice; script markers control speaker and acting.';
+  } catch (err) {
+    qwenLocalStatus.textContent = 'Could not reach local Qwen: ' + String(err?.message || err);
+  } finally {
+    qwenCheckButton.disabled = false;
+  }
+}
+
 function loadVoiceCatalog() {
   if (openedDirectly || typeof fetch !== 'function') return;
   fetch('/api/voices', {cache: 'no-store'})
@@ -530,24 +571,91 @@ function applyPronunciation(spoken) {
   return spoken;
 }
 
+/* ------------------------- Script acting markers --------------------------
+ * One line: ⟦speaker=ryan⟧ or ⟦acting="Laughing while crying"⟧.
+ * Voice and acting persist independently; ⟦acting=auto⟧ resets only acting.
+ * Scan the entire draft BEFORE restricting F8/F7 to the cursor/selection.
+ * Directive lines are skipped but original offset coordinates are preserved.
+ * Invalid marker lines are reported and never sent to speech generation.
+ * ------------------------------------------------------------------------- */
+const SCRIPT_QWEN_SPEAKERS = new Set([
+  'aiden', 'dylan', 'eric', 'ono_anna', 'ryan', 'serena', 'sohee', 'uncle_fu', 'vivian'
+]);
+const SCRIPT_LINE_MARKER = /^[ \t]*⟦(speaker|acting)=([\s\S]*?)⟧[ \t]*$/u;
+function parseScriptDirectionLine(line) {
+  if (/^[ \t]*\\⟦/u.test(line) || !/^[ \t]*⟦/u.test(line)) return null;
+  const m = line.match(SCRIPT_LINE_MARKER);
+  if (!m) return {error:'Malformed ⟦...⟧ direction'};
+  const kind = m[1], raw = m[2].trim();
+  if (kind === 'speaker') {
+    if (raw === 'auto') return {kind,value:''};
+    if (!SCRIPT_QWEN_SPEAKERS.has(raw)) return {error:'Unknown speaker preset: ' + raw.slice(0,80)};
+    return {kind,value:raw};
+  }
+  if (raw === 'auto') return {kind,value:''};
+  let value = raw;
+  if (raw.startsWith('"')) {
+    try { value = JSON.parse(raw); }
+    catch (_) { return {error:'Invalid quoted acting direction'}; }
+  }
+  if (typeof value !== 'string' || !value.trim() || value.length > 300 ||
+      /[\x00-\x1f\x7f]/.test(value)) {
+    return {error:'Acting direction must be 1–300 printable characters'};
+  }
+  return {kind,value:value.trim()};
+}
+function scriptRegions(text) {
+  const regions = [], errors = [];
+  let at = 0, start = 0, speaker = '', acting = '';
+  while (at < text.length) {
+    const newline = text.indexOf('\n',at);
+    const end = newline === -1 ? text.length : newline;
+    const directive = parseScriptDirectionLine(text.slice(at,end).replace(/\r$/,''));
+    if (directive) {
+      if (at > start) regions.push({start,end:at,speaker,acting});
+      if (directive.error) errors.push({start:at,end,message:directive.error});
+      else if (directive.kind === 'speaker') speaker = directive.value;
+      else acting = directive.value;
+      start = newline === -1 ? text.length : newline+1;
+    }
+    at = newline === -1 ? text.length : newline+1;
+  }
+  if (start < text.length) regions.push({start,end:text.length,speaker,acting});
+  return {regions,errors};
+}
+function showScriptDirectionIssues() {
+  const errors = scriptRegions(draft.value).errors;
+  scriptDirectionStatus.textContent = errors.length
+    ? errors.length + ' invalid direction marker(s). First: ' + errors[0].message + '. These lines will not be spoken.'
+    : 'Speaker and acting persist independently. Only Qwen applies acting directions.';
+}
+function insertScriptDirection(kind,value) {
+  // Place the marker ABOVE the cursor line. Never replace selected prose.
+  const at = draft.value.lastIndexOf('\n',draft.selectionStart-1)+1;
+  const marker = '⟦' + kind + '=' + value + '⟧\n';
+  draft.setRangeText(marker,at,at,'preserve');
+  draft.setSelectionRange(at+marker.length,at+marker.length);
+  draft.dispatchEvent(new Event('input',{bubbles:true}));
+  draft.focus();
+}
 function buildSegments(text, from, to) {
-  // Engine speed divides by pitch so the audible pace, after the playbackRate
-  // shift, always equals the Speed slider. The key uses this engine speed, so
-  // pitch changes invalidate exactly like speed changes do.
   const spd = Number(speed.value) / pitchFactor();
-  return segmentText(text, from, to).map((s) => {
-    const spoken = applyPronunciation(text.slice(s.start, s.end).replace(/\s+/g, ' ').trim());
-    return {
-      start: s.start,
-      end: s.end,
-      text: spoken,
-      speed: spd,
-      // Two disclosure modes must never share a cached sentence recording.
-      key: (currentVoice ? currentVoice.id : 'none') + '#' + currentSpeaker + '#' + deliveryPreset +
+  const qwen = currentVoice && currentVoice.backend === 'qwen3-local';
+  return scriptRegions(text).regions.flatMap(region => {
+    const a=Math.max(from,region.start), b=Math.min(to,region.end);
+    if (a>=b) return [];
+    return segmentText(text,a,b).map(span => {
+      const spoken=applyPronunciation(text.slice(span.start,span.end).replace(/\s+/g,' ').trim());
+      const speaker=region.speaker || 'vivian', acting=region.acting;
+      const originalKey=(currentVoice ? currentVoice.id : 'none') + '#' + currentSpeaker + '#' + deliveryPreset +
         (currentVoice && currentVoice.backend === 'cosyvoice3-local'
           ? '#' + (cosyvoiceProjectDisclosure.checked ? 'project' : 'spoken') : '') +
-        '|' + spd.toFixed(2) + '|' + spoken,
-    };
+        '|' + spd.toFixed(2) + '|' + spoken;
+      return {
+        start:span.start, end:span.end, text:spoken, speed:spd, speaker, acting,
+        key:qwen ? originalKey + '|qwen-direction:' + JSON.stringify([speaker,acting]) : originalKey
+      };
+    });
   });
 }
 
@@ -686,7 +794,7 @@ function postGenerate(index) {
   const seg = segments[index];
   const id = ++requestId;
   requestQueue.push({id, token: runToken, index, key: seg.key});
-  worker.postMessage({type: 'generate', id, text: seg.text, sid: currentSpeaker, speed: seg.speed});
+  worker.postMessage({type: 'generate', id, text: seg.text, sid: currentSpeaker, speed: seg.speed, speaker: seg.speaker, acting: seg.acting});
 }
 
 // Results and errors are matched to their request by echoed id, so a dropped
@@ -1676,7 +1784,7 @@ function updateStats() {
     statsInfo.textContent = '';
     return;
   }
-  const segs = segmentText(t, 0, t.length);
+  const segs = buildSegments(t, 0, t.length);
   const sentences = segs.length;
   let words = 0;
   let syllables = 0;
@@ -2244,7 +2352,9 @@ function handleWorkerMessage(event) {
         ? `Warning: ${integrityProblem} — the voice loaded, but re-copy the bundle if anything sounds wrong.`
         : currentVoice && currentVoice.backend === 'cosyvoice3-local'
           ? 'Press F8. Experimental GGUF audio includes a spoken AI disclaimer per sentence.'
-          : 'Place the cursor and press F8, or render the whole draft below.');
+          : currentVoice && currentVoice.backend === 'qwen3-local'
+            ? 'Qwen is ready. Script speaker/acting controls are active; AI audio remains watermarked.'
+            : 'Place the cursor and press F8, or render the whole draft below.');
       updateButtons();
       break;
     case 'sherpa-onnx-tts-result':
@@ -2285,6 +2395,23 @@ function handleWorkerError(event) {
 }
 
 cosyvoiceCheckButton.addEventListener('click', () => { void discoverLocalCosyVoice(); });
+qwenCheckButton.addEventListener('click', () => { void discoverLocalQwen(); });
+scriptSpeakerButton.addEventListener('click', () => {
+  insertScriptDirection('speaker',scriptSpeakerSelect.value);
+});
+scriptActingButton.addEventListener('click', () => {
+  const value=scriptActingText.value.trim();
+  if (!value) {
+    scriptDirectionStatus.textContent='Enter an acting direction or use Reset acting.';
+    scriptActingText.focus();
+    return;
+  }
+  insertScriptDirection('acting',JSON.stringify(value));
+});
+scriptActingReset.addEventListener('click', () => insertScriptDirection('acting','auto'));
+scriptActingPreset.addEventListener('change', () => {
+  if (scriptActingPreset.value) scriptActingText.value=scriptActingPreset.value;
+});
 cosyvoiceProjectDisclosure.addEventListener('change', () => {
   if (cosyvoiceProjectDisclosure.checked && !cosyvoiceRights.checked) {
     cosyvoiceProjectDisclosure.checked = false;
@@ -2492,6 +2619,7 @@ function runHeavyEditorWork() {
   refreshNarrationInfo();
   runLint();
   updateStats();
+  showScriptDirectionIssues();
   syncIdleBackdrop();
   if (!flagPanel.hidden) renderFlagPanel(); // an open panel tracks edits live
 }
@@ -2576,6 +2704,7 @@ window.addEventListener('pagehide', () => {
 
 describeSelection();
 updateButtons();
+showScriptDirectionIssues();
 runLint();
 updateStats();
 applyEditorMetrics();

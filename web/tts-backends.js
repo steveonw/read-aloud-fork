@@ -94,6 +94,13 @@
     return new WorkerCtor('cosyvoice-local.worker.js', {type:'module'});
   });
 
+  // Qwen CustomVoice GGUF: independent speaker and acting per sentence.
+  // No model is downloaded by this browser adapter.
+  registerBackend('qwen3-local', (WorkerCtor) => {
+    if (typeof WorkerCtor !== 'function') throw new Error('Web Worker support is unavailable');
+    return new WorkerCtor('qwen3-local.worker.js', {type:'module'});
+  });
+
   root.ReadAloudTTS = Object.freeze({
     createVoiceWorker,
     normalizeMessage,

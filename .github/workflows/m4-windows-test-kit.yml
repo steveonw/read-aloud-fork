@@ -13,6 +13,10 @@ on:
       - "web/tts-backends.js"
       - "web/tts-diagnostics.js"
       - "web/cosyvoice-local.worker.js"
+      - "web/qwen3-local.worker.js"
+      - "web/style.css"
+      - "scripts/qwen_worker_tests.js"
+      - "scripts/script_direction_tests.js"
       - "web/narration-provenance.js"
       - "scripts/narration_provenance_tests.js"
       - "web/index.html"
@@ -45,7 +49,10 @@ jobs:
         run: |
           node scripts/tts_backend_tests.js .
           node scripts/cosyvoice_worker_tests.js .
+          node scripts/qwen_worker_tests.js .
+          node scripts/script_direction_tests.js .
           node scripts/narration_provenance_tests.js .
+          node --check web/qwen3-local.worker.js
           node --check web/app.js
           node --check web/narration-provenance.js
       - name: Cross-build launcher and assemble overlay files
@@ -60,6 +67,8 @@ jobs:
           cp web/tts-backends.js "build/m4-test-kit/shared/tts-backends.js"
           cp web/tts-diagnostics.js "build/m4-test-kit/shared/tts-diagnostics.js"
           cp web/cosyvoice-local.worker.js "build/m4-test-kit/shared/cosyvoice-local.worker.js"
+          cp web/qwen3-local.worker.js "build/m4-test-kit/shared/qwen3-local.worker.js"
+          cp web/style.css "build/m4-test-kit/shared/style.css"
           cp web/narration-provenance.js "build/m4-test-kit/shared/narration-provenance.js"
           cp docs/M4_LOCAL_COSYVOICE_TEST.md "build/m4-test-kit/TEST-INSTRUCTIONS.md"
           cp LICENSE "build/m4-test-kit/LICENSE"

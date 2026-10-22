@@ -55,6 +55,45 @@
         <button id="tidyButton" class="quiet" type="button" title="Straighten quotes, remove hidden characters">Tidy text</button>
         <button id="clearButton" class="quiet" type="button">Clear</button>
       </div>
+      <details class="script-direction-panel" id="scriptDirectionPanel">
+        <summary>Script directions — Speaker &amp; Acting</summary>
+        <p class="script-help">Insert a direction <strong>above the cursor line</strong>. Speaker and acting stay in effect independently until another marker changes them. Markers are not spoken. Qwen3-TTS CustomVoice performs the acting; Amy and other voices ignore the directions while reading the prose.</p>
+        <div class="script-direction-grid">
+          <div class="script-direction-field">
+            <label for="scriptSpeakerSelect">Speaker — Qwen preset</label>
+            <select id="scriptSpeakerSelect">
+              <option value="vivian" selected>Vivian</option>
+              <option value="ryan">Ryan</option>
+              <option value="serena">Serena</option>
+              <option value="aiden">Aiden</option>
+              <option value="dylan">Dylan</option>
+              <option value="eric">Eric</option>
+              <option value="ono_anna">Ono Anna</option>
+              <option value="sohee">Sohee</option>
+              <option value="uncle_fu">Uncle Fu</option>
+              <option value="auto">Default (Vivian)</option>
+            </select>
+            <button id="scriptSpeakerButton" type="button">Insert Speaker</button>
+          </div>
+          <div class="script-direction-field">
+            <label for="scriptActingPreset">Acting — choose or describe freely</label>
+            <select id="scriptActingPreset">
+              <option value="" selected>Choose a suggested direction…</option>
+              <option value="Speak quietly, trembling with fear and trying not to be heard.">Frightened whisper</option>
+              <option value="Crying with happiness, laughing softly between tears.">Happy crying</option>
+              <option value="Terrified, shouting in desperation as the danger approaches.">Screaming in fear</option>
+              <option value="Emotionally numb, barely able to speak through grief.">Shocked and grieving</option>
+              <option value="Joyful, warm, and excited.">Happy and excited</option>
+            </select>
+            <input id="scriptActingText" type="text" maxlength="300" placeholder="e.g. Crying with joy while laughing nervously" aria-label="Freeform acting direction">
+            <div class="script-direction-actions">
+              <button id="scriptActingButton" type="button">Insert Acting</button>
+              <button id="scriptActingReset" type="button" class="quiet">Reset acting to natural</button>
+            </div>
+          </div>
+        </div>
+        <p class="script-direction-status" id="scriptDirectionStatus" aria-live="polite">Speaker and acting persist independently. Only Qwen applies acting directions.</p>
+      </details>
       <div class="lint-row" id="lintInfo" aria-live="polite"></div>
       <div class="flags-row" id="flagsRow" hidden>
         <span id="flagsInfo"></span>
@@ -180,6 +219,11 @@
           </label>
         </div>
         <p class="stats-line">OFF by default and resets when the page closes. The audio watermark stays ON. CosyVoice WAV/MP3 exports include plain AI-generated metadata, not signed C2PA credentials. Disclose AI speech visibly in your published film or project.</p>
+        <div class="tuning-row">
+          <button id="qwenCheckButton" class="quiet" type="button">Find local Qwen3-TTS GGUF</button>
+          <span id="qwenLocalStatus" role="status" aria-live="polite">Optional experimental CustomVoice. Start CrispASR with Qwen3-TTS 1.7B CustomVoice on port 18080 before selecting it.</span>
+        </div>
+        <p class="stats-line">Qwen acting instructions and speaker preset changes use the script markers above. Preset identity may require AI disclosure; native watermarking remains on. Only one native model uses port 18080 at a time.</p>
       </details>
     </section>
 
