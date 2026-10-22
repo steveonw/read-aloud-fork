@@ -1,13 +1,42 @@
 # Read-Aloud AI Narration — current handoff and next steps
 
-**Updated:** 2026-10-20  
-**Status:** Working experimental CosyVoice integration; next goal is expressive paragraph/scene acting. **Do not merge PR #9 yet.**  
+**Updated:** 2026-10-22  
+**Status:** CosyVoice integration working; **Qwen3-TTS CustomVoice direct emotion-WAV test now succeeded on GTX 1650**. Next goal is optional Qwen integration and paragraph/scene acting, preserving existing sentences. **Do not merge PR #9 yet.**  
 **Repository:** https://github.com/steveonw/read-aloud-fork  
 **Issue:** https://github.com/steveonw/read-aloud-fork/issues/8  
 **Draft PR:** https://github.com/steveonw/read-aloud-fork/pull/9  
 **Working branch:** `m4/local-cosyvoice-bridge` (never `main`)  
 **Stable original:** https://github.com/steveonw/Read-Aloud-Main  
 **Engineering history:** [HANDOFF_M4_COSYVOICE_GGUF.md](HANDOFF_M4_COSYVOICE_GGUF.md)
+
+## Current milestone — 2026-10-22: Qwen3-TTS acting instructions work in first real Windows WAV test
+
+The user **successfully started the existing custom CrispASR v0.8.43 CPU+CUDA executable** as a separate local server with:
+
+```bash
+cd ~/crispasr-gguf-legacy
+./crispasr.exe --server --backend qwen3-tts-1.7b-customvoice -m auto \
+  --voice vivian --host 127.0.0.1 --port 18080
+```
+
+The same binary resolved/downloaded **`qwen3-tts-12hz-1.7b-customvoice-q8_0.gguf` (~2.0 GB)** and **`qwen3-tts-tokenizer-12hz.gguf` codec**, loaded both, and reached `listening on 127.0.0.1:18080`. A GTX 1650 with 4 GB total VRAM was detected. No CrispASR rebuild, Python install, or Read-Aloud change was required. The CosyVoice backup weights and command remain intact.
+
+Three direct HTTP `POST /v1/audio/speech` calls used identical text ("Please stay with me, I cannot face tomorrow without you."), **seed 1234**, and the same `vivian` voice inherited from server startup; only `instructions` changed (none, crying, happy). The user provided the WAVs **in ChatGPT, not GitHub**:
+
+| User WAV | Direction | WAV result |
+| --- | --- | --- |
+| `normal(1).wav` | no instructions | 5.04 sec |
+| `crying(1).wav` | sad, trembling, holding back tears | 6.24 sec |
+| `happy.wav` | happy/excited/almost laughing | 3.92 sec |
+
+All decode at **24 kHz mono**. The samples are **not identical**; on listening, the crying reading is more breathy/strained, the happy reading quicker/brighter and the normal reading calmer. **This is strong preliminary evidence the native Qwen CustomVoice backend genuinely receives acting instructions on the user's hardware.** The line's sad wording may limit how convincingly "happy" sounds. Only short-sentence acting is verified; long-form consistency/quality is not.
+
+User reports generation felt **very fast**, but no precise per-request generation durations were supplied, so **do not claim a measured Qwen real-time factor from WAV durations**.
+
+**New next milestone:** With the user's go-ahead, add Qwen as an **optional selectable voice engine in the isolated Read-Aloud M4 Go proxy/browser worker**, passing paragraph/scene direction as per-sentence `instructions`. Keep one sentence per synthesis, existing replay/timing/label/export pipeline, stable Amy/Lessac and CosyVoice as fallback, and any approved takes outside changed spans untouched. Before adding duplicate take functionality, audit what Read-Aloud already provides. Model/voice/direction/settings must be considered in cache identity. Test with three adjacent paragraphs and different directions before expanding.
+
+The separately built **CrispASR Server Control** GUI is still **CosyVoice-only** and only CI-tested; actual on-PC buttons are not yet verified. Do not attempt to launch its CosyVoice while the manual Qwen server already occupies port `18080`. Do not overwrite original working Read-Aloud, `main`, or CrispASR binaries.
+
 
 ## 1. What the user actually wants
 
@@ -48,7 +77,7 @@ The user-supplied audio and label files were provided **in ChatGPT**, not added 
 **Controller instructions:** [../tools/crispasr-server-control/README.md](../tools/crispasr-server-control/README.md)  
 **Windows M4 test-copy guide:** [M4_LOCAL_COSYVOICE_TEST.md](M4_LOCAL_COSYVOICE_TEST.md)
 
-## 4. Important direct test: why we are considering Qwen3-TTS
+## 4. Historical findings before the successful 2026-10-22 Qwen test (superseded above)
 
 The user generated **two WAVs directly from CrispASR without Read-Aloud**, identical text and seed, with/without an instruction to speak as if crying. The audio samples were **identical**. This confirms that the **current CrispASR CosyVoice path is not applying that emotional instruction**. Do not add paragraph emotion text boxes that silently do nothing.
 
@@ -58,7 +87,7 @@ CrispASR v0.8.43's Qwen3-TTS CustomVoice native adapter contains optional style-
 
 This should be a **server-only WAV comparison first**, not an immediate Read-Aloud replacement.
 
-## 5. Agreed development direction — next sessions
+## 5. Original pre-test development outline (Qwen experiment completed; follow current milestone above)
 
 **First, minimal user check:** Try the new **CrispASR Server Control** GUI on Windows. If CrispASR is already running in Git Bash, stop it *there* with Ctrl+C; open the GUI, choose the existing `crispasr.exe`, press Start, check its health and Read-Aloud connectivity, close/reopen the GUI, and try Stop. Do not assume CI proves it works on the target PC. Do not overwrite the native binary.
 
@@ -83,10 +112,9 @@ This should be a **server-only WAV comparison first**, not an immediate Read-Alo
 - Keep the original [Read-Aloud-Main](https://github.com/steveonw/Read-Aloud-Main), the original USB install, existing `~/crispasr-gguf-legacy` executable and cached models unchanged. Use an isolated M4 test-copy folder.
 - Work only on draft PR #9 / `m4/local-cosyvoice-bridge` unless explicitly authorized. **Do not merge into `main`** or assume a packaged experimental ZIP is a complete USB distribution.
 - Continue to require rights to use the voice and responsible AI-generated-audio disclosure. Do not silently disable watermark/provenance to avoid an audible announcement.
-- Do not claim Qwen voice emotion control, the mini-controller GUI, or persistent locked takes have already been proven on the user's computer.
+- Qwen acting variation is confirmed for **three short user-supplied WAVs only**. Do not claim long-form consistency, fully working paragraph controls, the server-controller GUI on the user's PC, or persistent locked takes until separately tested.
 - No further code changes without discussion of the next specific feature and the user's go-ahead.
 
 ## 7. Copy/paste prompt for the next chat
 
-> Continue the Read-Aloud AI narration project at `steveonw/read-aloud-fork`, Issue #8, **draft PR #9** on `m4/local-cosyvoice-bridge`. **Read `docs/HANDOFF_NEXT_SESSION.md` first**, then the older `docs/HANDOFF_M4_COSYVOICE_GGUF.md` for engineering history. The stable original is `steveonw/Read-Aloud-Main`; preserve original USB and native CrispASR. User has Windows i5-2400 (no AVX2), GTX 1650 4GB, proven CrispASR v0.8.43 portable CPU+CUDA at localhost:18080 and Read-Aloud Go UI on its own local port. CosyVoice GGUF voice, per-sentence F8/timing, one-session clean narration, MP3/Audacity labels and a 16:51 / 342-segment real export are working. A separate GUI server controller passed Windows CI but has NOT yet been user-tested. **Real goal:** paragraph/scene acting directions (crying, happy, child, narrator) while retaining single-sentence generation and preserving approved recordings outside emotion ranges. Direct CosyVoice normal-vs-crying WAVs were identical, so do **not** build emotion UI on current CosyVoice. Existing CrispASR lists Qwen3-TTS CustomVoice/VoiceDesign backends, but no Qwen weights or voice-emotion test has been verified. **Next:** test controller on the user's PC; when approved, run direct Qwen normal/sad/happy WAVs on the existing second server before any Go/Read-Aloud changes. Keep CosyVoice as fallback, no reinstall or premature merges, keep watermark and AI disclosure.
-
+> Continue Read-Aloud AI narration `steveonw/read-aloud-fork`, Issue #8 and **draft PR #9** on `m4/local-cosyvoice-bridge`. Read `docs/HANDOFF_NEXT_SESSION.md` (topmost 2026-10-22 milestone) then historical M4 handoff. Protect `Read-Aloud-Main`, original USB, `main`, cached GGUF files and legacy CPU+CUDA CrispASR v0.8.43 executable. User's i5-2400/GTX1650 4GB runs CosyVoice GGUF and Read-Aloud Go bridge; their 16:51 / 342-segment MP3 and F8/timing/export worked. **Newest successful direct test:** user's existing CrispASR `--backend qwen3-tts-1.7b-customvoice -m auto --voice vivian` downloaded Q8 talker plus codec, loaded on GPU and generated 3 short `normal(1).wav`, `crying(1).wav`, `happy.wav` with fixed seed 1234 and identical text. They have different audio and durations (5.04, 6.24, 3.92 sec), and perceptible differences in acting, unlike identical CosyVoice WAVs. User reports quick generation but no precise RTF. Thus Qwen emotion instruction proof-of-concept **works** and prior "not tested" notes are historical. **Next ONLY if authorized:** wire Qwen as optional backend in isolated M4 Go proxy/worker; preserve one-sentence synthesis, caching, timing, approved recordings, Audacity labels and CosyVoice fallback. Then add nonspoken paragraph/scene emotion spans to next direction or reset. Mini Server Control GUI currently CosyVoice-only, CI-tested but not field-tested. No reinstallation, native rebuild, automatic merge or removal of disclosure/watermarks. WAVs are in ChatGPT only, not GitHub.
