@@ -35,7 +35,7 @@
         ? data.backends.find(b => b.id === 'cosyvoice3-local') : null;
       const label = cos && cos.state === 'ready' ? 'CosyVoice ready'
         : cos && cos.state === 'warning' ? 'CosyVoice compatibility unverified'
-        : 'CosyVoice native backend not installed';
+        : 'CosyVoice local server not running';
       output.textContent = readableGPU(data.gpu) + ' — ' + label +
         '. Portable proofreading remains available.';
     } catch (err) {

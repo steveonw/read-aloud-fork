@@ -55,6 +55,45 @@
         <button id="tidyButton" class="quiet" type="button" title="Straighten quotes, remove hidden characters">Tidy text</button>
         <button id="clearButton" class="quiet" type="button">Clear</button>
       </div>
+      <details class="script-direction-panel" id="scriptDirectionPanel">
+        <summary>Script directions — Speaker &amp; Acting</summary>
+        <p class="script-help">Insert a direction <strong>above the cursor line</strong>. Speaker and acting stay in effect independently until another marker changes them. Markers are not spoken. Qwen3-TTS CustomVoice performs the acting; Amy and other voices ignore the directions while reading the prose.</p>
+        <div class="script-direction-grid">
+          <div class="script-direction-field">
+            <label for="scriptSpeakerSelect">Speaker — Qwen preset</label>
+            <select id="scriptSpeakerSelect">
+              <option value="vivian" selected>Vivian</option>
+              <option value="ryan">Ryan</option>
+              <option value="serena">Serena</option>
+              <option value="aiden">Aiden</option>
+              <option value="dylan">Dylan</option>
+              <option value="eric">Eric</option>
+              <option value="ono_anna">Ono Anna</option>
+              <option value="sohee">Sohee</option>
+              <option value="uncle_fu">Uncle Fu</option>
+              <option value="auto">Default (Vivian)</option>
+            </select>
+            <button id="scriptSpeakerButton" type="button">Insert Speaker</button>
+          </div>
+          <div class="script-direction-field">
+            <label for="scriptActingPreset">Acting — choose or describe freely</label>
+            <select id="scriptActingPreset">
+              <option value="" selected>Choose a suggested direction…</option>
+              <option value="Speak quietly, trembling with fear and trying not to be heard.">Frightened whisper</option>
+              <option value="Crying with happiness, laughing softly between tears.">Happy crying</option>
+              <option value="Terrified, shouting in desperation as the danger approaches.">Screaming in fear</option>
+              <option value="Emotionally numb, barely able to speak through grief.">Shocked and grieving</option>
+              <option value="Joyful, warm, and excited.">Happy and excited</option>
+            </select>
+            <input id="scriptActingText" type="text" maxlength="300" placeholder="e.g. Crying with joy while laughing nervously" aria-label="Freeform acting direction">
+            <div class="script-direction-actions">
+              <button id="scriptActingButton" type="button">Insert Acting</button>
+              <button id="scriptActingReset" type="button" class="quiet">Reset acting to natural</button>
+            </div>
+          </div>
+        </div>
+        <p class="script-direction-status" id="scriptDirectionStatus" aria-live="polite">Speaker and acting persist independently. Only Qwen applies acting directions.</p>
+      </details>
       <div class="lint-row" id="lintInfo" aria-live="polite"></div>
       <div class="flags-row" id="flagsRow" hidden>
         <span id="flagsInfo"></span>
@@ -160,11 +199,31 @@
         </div>
       </details>
       <details class="ctl-group" id="gpuGroup">
-        <summary>CosyVoice hardware check (optional)</summary>
+        <summary>Local GGUF voice engines (optional)</summary>
         <div class="tuning-row">
           <button id="gpuProbeButton" class="quiet" type="button">Check local GPU</button>
           <span id="gpuProbeStatus" role="status" aria-live="polite">Not checked. Portable voices work without a GPU.</span>
         </div>
+        <div class="tuning-row">
+          <label class="toggle" for="cosyvoiceRights">
+            <input type="checkbox" id="cosyvoiceRights">
+            I have the rights to use the selected CosyVoice preset
+          </label>
+          <button id="cosyvoiceCheckButton" class="quiet" type="button">Find local CosyVoice GGUF</button>
+          <span id="cosyvoiceLocalStatus" role="status" aria-live="polite">Optional experimental native voice. Start the local CrispASR server first.</span>
+        </div>
+        <div class="tuning-row">
+          <label class="toggle" for="cosyvoiceProjectDisclosure">
+            <input type="checkbox" id="cosyvoiceProjectDisclosure">
+            Narration mode: I will disclose AI-generated narration in my published project; do not speak the announcement before every sentence
+          </label>
+        </div>
+        <p class="stats-line">OFF by default and resets when the page closes. The audio watermark stays ON. CosyVoice WAV/MP3 exports include plain AI-generated metadata, not signed C2PA credentials. Disclose AI speech visibly in your published film or project.</p>
+        <div class="tuning-row">
+          <button id="qwenCheckButton" class="quiet" type="button">Find local Qwen3-TTS GGUF</button>
+          <span id="qwenLocalStatus" role="status" aria-live="polite">Optional experimental CustomVoice. Start CrispASR with Qwen3-TTS 1.7B CustomVoice on port 18080 before selecting it.</span>
+        </div>
+        <p class="stats-line">Qwen acting instructions and speaker preset changes use the script markers above. Preset identity may require AI disclosure; native watermarking remains on. Only one native model uses port 18080 at a time.</p>
       </details>
     </section>
 
@@ -220,8 +279,8 @@
     </details>
 
     <section class="privacy-note">
-      <strong>No internet is used.</strong>
-      Text stays in this browser tab. Rendered audio is kept in this tab's memory for replay and export; nothing is uploaded, and an audio file is written only when you choose Export.
+      <strong>Portable voices work offline.</strong>
+      With the built-in browser voices, text stays in this tab and generated audio stays in memory until export. If you explicitly enable local CosyVoice GGUF, selected sentences are sent only to its separately running process at <code>127.0.0.1</code> on this computer; starting that process with <code>-m auto</code> may download missing model weights. No cloud speech server is used by this edition.
       <span class="quit-line"><button id="quitButton" class="quiet" type="button">Shut down Read Aloud</button></span>
     </section>
 
@@ -267,6 +326,7 @@
   </main>
 
   <script src="tts-backends.js" defer></script>
+  <script src="narration-provenance.js" defer></script>
   <script src="app.js" defer></script>
   <script src="tts-diagnostics.js" defer></script>
 </body>
