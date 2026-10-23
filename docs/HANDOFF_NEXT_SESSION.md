@@ -9,6 +9,32 @@
 **Stable original:** https://github.com/steveonw/Read-Aloud-Main  
 **Engineering history:** [HANDOFF_M4_COSYVOICE_GGUF.md](HANDOFF_M4_COSYVOICE_GGUF.md)
 
+## Third M4e field export — 11-stage acting-complexity WAV test (2026-10-22)
+
+**User submission:** `read-aloud-narration.wav` and `read-aloud-narration-labels(5).txt` uploaded in the ChatGPT conversation, **not committed to GitHub**. This is the progressive acting-direction stress test proposed after the first expressive-acting MP3.
+
+**Verified file facts:** 41.900-second WAV, 24,000 Hz mono, signed 16-bit PCM. Exactly **11 Audacity label intervals**, in playback order, with ten **0.750-second** inter-label gaps. All labels fit within the recording and terminate exactly at 41.900 seconds. Audio peaks remain below digital full-scale; no sample-level clipping. Markers `⟦speaker=...⟧` / `⟦acting=...⟧` are absent from spoken output and labels. The full test completed with intelligible speech.
+
+**Controlled part (stages 1–7):** each line says exactly **"I didn't expect to see you here."**, using Vivian with increasingly complex acting prompts:
+
+| Stage | Acting request | Audio duration | Initial assessment |
+| --- | --- | --- | --- |
+| 1 | natural/auto | 2.08 s | fluent neutral control |
+| 2 | simple happiness | 1.92 s | audible prosodic change, happiness somewhat restrained |
+| 3 | sadness with trembling voice | 2.56 s | slower/more delicate delivery, partial style match |
+| 4 | crying with happiness | 2.56 s | playful/breathy emotion, literal tears not clearly conveyed |
+| 5 | outward delight concealing fear | 2.48 s | more nuanced hidden fear not reliably distinguishable |
+| 6 | relieved disbelief → suspicion → quiet fear | 2.48 s | no clear three-part emotional sequence |
+| 7 | nervous laugh → guilt → happy tears → terror | 2.72 s | expressive reading, but four requested shifts not independently distinguishable |
+
+The recordings have objectively different acoustic duration and RMS levels, but that **alone does not prove instruction-following**. Subjective judgments of mixed feelings are provisional. Most notable limitation is **precise sequential emotion within one short utterance**, emerging around stages **5–7**. There was no catastrophic text loss or audio breakdown; this is **instruction-control fidelity**, not a computational crash or definitive model 'intelligence ceiling'. Stage 7 only has 2.72 seconds of speech to perform four psychological transitions, so the test itself is demanding beyond prompt length.
+
+**Scenes 8–11:** Vivian whispers fear (5.84 s), Ryan answers under the *inherited* frightened acting direction (4.96 s), Vivian returns with relieved-to-alarmed direction (3.36 s), and `acting=auto` resets the narrator (3.44 s). Both speaker change and return to neutral are audible and the label timing structure holds. Stage 10 conveys alarm but not a clearly controlled relief-to-desperate-shout transition within one sentence. Changes in stages 8–11 also change text, voice and acting, so don't use them as a controlled single-variable emotion benchmark.
+
+**Reproducibility caution:** current `web/qwen3-local.worker.js` and `cmd/launcher/qwen_local.go` do **not** supply a fixed request seed; unlike the previous direct CrispASR curl experiments, this Read-Aloud export is **not seed-controlled**. Sentence-level cache keys include the acting text, which prevents different directives from accidentally reusing identical cached audio, but repeated runs may retrieve the existing cache instead of synthesizing new audio. A single instance per stage cannot support a statistical claim about the first reliable failure.
+
+**Recommendation:** treat single emotions and inherited cross-speaker scene acting as proven useful. For nuanced multi-transition acting, prefer separate short acting scopes/clauses and human audition; do not automatically normalize uppercase or force increasingly verbose prompts. If testing the model limit further, repeat stages 4–7 with a **longer, semantically appropriate line**, and control generation variability/caching before concluding a hard threshold. No application code was changed for this review.
+
 ## Second M4e user export — independent speaker switch and Audacity labels (2026-10-22)
 
 The user uploaded **`read-aloud-narration(7).mp3`** and its companion **`read-aloud-narration-labels(4).txt`** directly in ChatGPT, **not into GitHub**. The user explicitly confirmed that **James switches voices**. On listening, the lower voice on James's lines is distinct from Vivian, followed by a switch back to Vivian for the screaming line. Unicode directive markers do not appear in the narration or the label texts.
