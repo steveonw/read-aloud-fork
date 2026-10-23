@@ -9,6 +9,24 @@
 **Stable original:** https://github.com/steveonw/Read-Aloud-Main  
 **Engineering history:** [HANDOFF_M4_COSYVOICE_GGUF.md](HANDOFF_M4_COSYVOICE_GGUF.md)
 
+## Second M4e user export — independent speaker switch and Audacity labels (2026-10-22)
+
+The user uploaded **`read-aloud-narration(7).mp3`** and its companion **`read-aloud-narration-labels(4).txt`** directly in ChatGPT, **not into GitHub**. The user explicitly confirmed that **James switches voices**. On listening, the lower voice on James's lines is distinct from Vivian, followed by a switch back to Vivian for the screaming line. Unicode directive markers do not appear in the narration or the label texts.
+
+**Audio metadata checked:** MP3, 24,000 Hz, mono, duration **26.448 s**. The labels file contains exactly **10 non-overlapping, chronologically ordered spans**, beginning at **0.000 s** and ending at **26.390 s** (audio has **0.058 s** remaining). Consecutive label gaps are only **0.12 or 0.35 s**. No label extends beyond audio duration. This checks export timeline consistency, **not sample-accurate phoneme alignment inside Audacity**.
+
+| Label span(s) | Per-sentence text and expected direction |
+| --- | --- |
+| 0.00–4.83 s, 2 labels | Vivian frightened: "James, don't move." + "He's standing right outside the door." |
+| 4.95–10.10 s, 2 labels | Ryan, same frightened acting: "I can hear his footsteps getting closer." + "What are we going to do?" |
+| 10.22–15.16 s, 3 labels | Vivian panicked: "JAMES!" + "RUN!" + "HE'S COMING!" |
+| 15.28–20.35 s, 2 labels | Vivian relieved/happy-crying: "Oh, thank God you're alive!" + "I thought I'd lost you forever!" |
+| 20.47–26.39 s, 1 label | Vivian natural after `acting=auto`: "The hallway fell silent..." |
+
+**Assessment:** Speaker switching and independent acting changes are audibly promising; the speech/labels export retains the intended sequence and skips directive lines. The elongated/less intelligible **"RUN!"** remains the main acting-quality issue. One export plus timestamps does **not** establish F8-from-cursor inheritance, cache reuse under edits, durability of approved takes, or sample-accurate label alignment. The precise CrispASR speaker ID for Ryan was not captured in a native console log, although the audible voice difference is obvious.
+
+**Next practical checks:** change only `RUN!` to `Run!` and compare its isolated re-render, test F8 from James's line to confirm earlier acting remains inherited, then import the labels into Audacity and visually confirm boundaries at the intended sentences. Avoid rebuilding or adding features until these acceptance checks are done. Stable USB and `main` remain untouched.
+
 ## User's first M4e Speaker + Acting MP3 acceptance test (2026-10-22)
 
 **Source:** user uploaded `read-aloud-narration(6).mp3` in ChatGPT (NOT committed to GitHub) after running the five-scene script supplied for the experimental Qwen3-TTS integration. The MP3 is **26.448 seconds, 24 kHz mono** (64 kb/s encoding). The supplied audio/transcription reaches the final natural narrator sentence; **no Unicode direction markers were spoken**.
