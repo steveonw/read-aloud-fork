@@ -86,6 +86,21 @@
     return new WorkerCtor('sherpa-onnx-tts.worker.js', {type: 'module'});
   });
 
+  // Optional native GGUF backend: only selected after the local server is
+  // discovered and the user acknowledges voice rights. The existing WASM
+  // transport remains the default and runs even without CrispASR installed.
+  registerBackend('cosyvoice3-local', (WorkerCtor) => {
+    if (typeof WorkerCtor !== 'function') throw new Error('Web Worker support is unavailable');
+    return new WorkerCtor('cosyvoice-local.worker.js', {type:'module'});
+  });
+
+  // Qwen CustomVoice GGUF: independent speaker and acting per sentence.
+  // No model is downloaded by this browser adapter.
+  registerBackend('qwen3-local', (WorkerCtor) => {
+    if (typeof WorkerCtor !== 'function') throw new Error('Web Worker support is unavailable');
+    return new WorkerCtor('qwen3-local.worker.js', {type:'module'});
+  });
+
   root.ReadAloudTTS = Object.freeze({
     createVoiceWorker,
     normalizeMessage,

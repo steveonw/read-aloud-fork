@@ -154,8 +154,7 @@ func inspectTTSCapabilities(ctx context.Context) ttsCapabilities {
 		Backends: []backendCapability{
 			{ID: "sherpa-wasm", State: "ready", Reason: "browser_wasm_available", CanTry: true,
 				Message: "Portable offline voices remain available when installed."},
-			{ID: "cosyvoice3-local", State: "unavailable", Reason: "native_backend_not_installed", CanTry: false,
-				Message: "CosyVoice is not installed in this edition. GPU detection does not prove model compatibility."},
+				detectCosyVoiceLocal(ctx),
 		},
 	}
 }

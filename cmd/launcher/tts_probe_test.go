@@ -97,7 +97,7 @@ func TestTTSHardwareEndpointHostAndMethods(t *testing.T) {
 	}
 }
 
-func TestTTSHardwareEndpointNeverClaimsUninstalledCosyVoiceReady(t *testing.T) {
+func TestTTSHardwareEndpointNeverClaimsUnreadyCosyVoiceReady(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:17391/api/tts/capabilities", nil)
 	rw := httptest.NewRecorder()
 	ttsCapabilitiesHandler(rw, req)
@@ -113,7 +113,7 @@ func TestTTSHardwareEndpointNeverClaimsUninstalledCosyVoiceReady(t *testing.T) {
 		data.Backends[1].ID != "cosyvoice3-local" ||
 		data.Backends[1].State != "unavailable" ||
 		data.Backends[1].CanTry ||
-		data.Backends[1].Reason != "native_backend_not_installed" {
-		t.Fatalf("uninstalled CosyVoice must remain unavailable: %+v", data)
+		data.Backends[1].Reason != "server_not_ready" {
+		t.Fatalf("CosyVoice without local server must remain unavailable: %+v", data)
 	}
 }

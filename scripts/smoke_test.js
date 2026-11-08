@@ -18,7 +18,7 @@ const exists = (p) => fs.existsSync(p);
 const size = (p) => (exists(p) ? fs.statSync(p).size : 0);
 
 for (const f of ['index.html', 'app.js', 'tts-backends.js', 'tts-diagnostics.js', 'style.css', 'mp3-worker.js', 
-                 'sherpa-onnx-tts.js', 'sherpa-onnx-tts.worker.js',
+                 'sherpa-onnx-tts.js', 'sherpa-onnx-tts.worker.js', 'cosyvoice-local.worker.js',
                  path.join('vendor', 'lame.min.js')]) {
   check(`shared/${f} present`, exists(path.join(shared, f)));
 }
@@ -35,7 +35,7 @@ for (const f of ['START - WINDOWS.exe', 'START - LINUX.sh', 'README.txt', 'SHA25
 }
 
 // app.js and mp3-worker.js must be valid JavaScript
-for (const f of ['app.js', 'tts-backends.js', 'tts-diagnostics.js', 'mp3-worker.js']) {
+for (const f of ['app.js', 'tts-backends.js', 'tts-diagnostics.js', 'mp3-worker.js', 'cosyvoice-local.worker.js']) {
   let ok = true, msg = '';
   try { execFileSync(process.execPath, ['--check', path.join(shared, f)]); }
   catch (e) { ok = false; msg = String(e.stderr || e); }

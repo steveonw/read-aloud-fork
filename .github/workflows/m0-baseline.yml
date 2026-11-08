@@ -34,6 +34,7 @@ jobs:
         run: |
           npm install --no-save jsdom@29.1.1
           node scripts/tts_backend_tests.js .
+          node scripts/cosyvoice_worker_tests.js .
           node scripts/tts_diagnostics_tests.js .
           node scripts/web_tests.js . 17391
           node scripts/stress_tests.js .

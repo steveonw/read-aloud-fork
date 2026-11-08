@@ -154,6 +154,13 @@ func main() {
 	// Read-only local diagnostics; does not launch or load a native TTS model.
 	mux.HandleFunc("/api/tts/capabilities", ttsCapabilitiesHandler)
 
+	// M4: optional native GGUF provider. All requests stay on the fixed
+	// IPv4 loopback address; the browser cannot choose a target URL.
+	mux.Handle("/api/tts/cosyvoice/", cosyVoiceLocalHandler(runToken))
+	// Qwen3-TTS CustomVoice has its own strict loopback-only route and voice
+	// allowlist; this does not alter the proven CosyVoice proxy.
+	mux.Handle("/api/tts/qwen/", qwenLocalHandler(runToken))
+
 	mux.HandleFunc("/api/voices", func(w http.ResponseWriter, r *http.Request) {
 		if !validHost(r.Host) {
 			http.Error(w, "invalid host", http.StatusForbidden)
