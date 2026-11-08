@@ -1,6 +1,7 @@
 // Optional portable local server controller for Read-Aloud M4.
 // Windows 10+, .NET Framework 4.x. Does NOT install, alter, or update CrispASR.
-// It starts only the user's existing crispasr.exe with the proven CosyVoice flags.
+// Browse an existing GGUF, choose CosyVoice or Qwen, then start the user's existing crispasr.exe.
+// No downloads, installs, model changes, external hosts, or automatic server switching in the controller.
 // Stop is allowed only for the exact process instance started by this controller.
 using System;
 using System.Diagnostics;
@@ -29,13 +30,29 @@ namespace ReadAloudCrispASRControl
 
         private static int SelfTest()
         {
-            var valid = ServerWindow.MakeArguments().Contains("--backend cosyvoice3-tts-rl")
-                && ServerWindow.MakeArguments().Contains("--host 127.0.0.1 --port 18080")
-                && !ServerWindow.MakeArguments().Contains("--no-watermark")
-                && !ServerWindow.MakeArguments().Contains("--no-c2pa");
-            var h = ServerWindow.ParseHealth("{\"status\":\"ok\",\"backend\":\"cosyvoice3-tts-rl\"}");
-            var other = ServerWindow.ParseHealth("{\"status\":\"error\",\"backend\":\"cosyvoice3-tts-rl\"}");
-            valid = valid && h == "cosyvoice3-tts-rl" && other == null;
+            string cosy = ServerWindow.MakeArguments();
+            string qwen = ServerWindow.MakeArguments("qwen3-tts-1.7b-customvoice", "", "");
+            string picked = ServerWindow.MakeArguments(
+                "qwen3-tts-1.7b-customvoice",
+                @"C:\Speech Models\talker.gguf", @"C:\Speech Models\codec.gguf");
+            string pickedCosy = ServerWindow.MakeArguments(
+                "cosyvoice3-tts-rl", @"C:\Speech Models\cosyvoice3-llm-rl-q4_k.gguf", "");
+            bool valid = cosy.Contains("--backend cosyvoice3-tts-rl -m auto")
+                && cosy.Contains("--voice fleurs-en --i-have-rights")
+                && qwen.Contains("--backend qwen3-tts-1.7b-customvoice -m auto")
+                && qwen.Contains("--voice vivian")
+                && picked.Contains("-m \"C:\\Speech Models\\talker.gguf\"")
+                && picked.Contains("--codec-model \"C:\\Speech Models\\codec.gguf\"")
+                && pickedCosy.Contains("-m \"C:\\Speech Models\\cosyvoice3-llm-rl-q4_k.gguf\"");
+            valid = valid && cosy.Contains("--host 127.0.0.1 --port 18080")
+                && qwen.Contains("--host 127.0.0.1 --port 18080")
+                && !cosy.Contains("--no-watermark") && !qwen.Contains("--no-watermark")
+                && !picked.Contains("--no-c2pa");
+            string h = ServerWindow.ParseHealth("{\"status\":\"ok\",\"backend\":\"cosyvoice3-tts-rl\"}");
+            string qh = ServerWindow.ParseHealth("{\"status\":\"ok\",\"backend\":\"qwen3-tts-1.7b-customvoice\"}");
+            string other = ServerWindow.ParseHealth("{\"status\":\"error\",\"backend\":\"cosyvoice3-tts-rl\"}");
+            valid = valid && h == "cosyvoice3-tts-rl"
+                && qh == "qwen3-tts-1.7b-customvoice" && other == null;
             return valid ? 0 : 1;
         }
     }
@@ -43,10 +60,21 @@ namespace ReadAloudCrispASRControl
     internal sealed class ServerWindow : Form
     {
         private const string LocalHealthUrl = "http://127.0.0.1:18080/health";
+        private const string CosyBackend = "cosyvoice3-tts-rl";
+        private const string QwenBackend = "qwen3-tts-1.7b-customvoice";
         private readonly string stateDirectory;
         private readonly string managedFile;
         private readonly string settingsFile;
+        private readonly string backendSettingsFile;
+        private readonly string cosyModelSettingsFile;
+        private readonly string qwenModelSettingsFile;
+        private readonly string codecSettingsFile;
         private readonly TextBox pathInput;
+        private readonly ComboBox engineSelect;
+        private readonly TextBox modelInput;
+        private readonly TextBox codecInput;
+        private readonly Button browseCodec;
+        private readonly CheckBox rightsCheck;
         private readonly Label status;
         private readonly Label note;
         private readonly Button startButton;
@@ -54,16 +82,45 @@ namespace ReadAloudCrispASRControl
         private readonly Timer refreshTimer;
         private bool busy;
 
+        // Fixed backend and address allowlist. The selected model is an existing local
+        // GGUF, passed directly to the executable (never through a shell).
         public static string MakeArguments()
         {
-            return "--server --backend cosyvoice3-tts-rl -m auto " +
-                   "--voice fleurs-en --i-have-rights --host 127.0.0.1 --port 18080";
+            return MakeArguments(CosyBackend, "", "");
+        }
+
+        private static string QuoteModelArgument(string path)
+        {
+            if (String.IsNullOrEmpty(path) || path.IndexOf('"') >= 0 ||
+                path.IndexOf('\r') >= 0 || path.IndexOf('\n') >= 0)
+                throw new ArgumentException("Invalid local model path");
+            return "\"" + Path.GetFullPath(path) + "\"";
+        }
+
+        public static string MakeArguments(string backend, string model, string codec)
+        {
+            if (backend != CosyBackend && backend != QwenBackend)
+                throw new ArgumentException("Unsupported speech backend");
+            string args = "--server --backend " + backend + " -m " +
+                (String.IsNullOrEmpty(model) ? "auto" : QuoteModelArgument(model));
+            if (backend == CosyBackend)
+            {
+                if (!String.IsNullOrEmpty(codec)) throw new ArgumentException("CosyVoice has no Qwen codec option");
+                args += " --voice fleurs-en --i-have-rights";
+            }
+            else
+            {
+                args += " --voice vivian";
+                if (!String.IsNullOrEmpty(codec))
+                    args += " --codec-model " + QuoteModelArgument(codec);
+            }
+            return args + " --host 127.0.0.1 --port 18080";
         }
 
         public ServerWindow()
         {
             Text = "CrispASR Server Control - Read-Aloud";
-            ClientSize = new Size(658, 317);
+            ClientSize = new Size(658, 532);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -75,6 +132,10 @@ namespace ReadAloudCrispASRControl
                 "ReadAloudCrispASRControl");
             managedFile = Path.Combine(stateDirectory, "managed-process.txt");
             settingsFile = Path.Combine(stateDirectory, "crispasr-path.txt");
+            backendSettingsFile = Path.Combine(stateDirectory, "selected-backend.txt");
+            cosyModelSettingsFile = Path.Combine(stateDirectory, "cosy-model.txt");
+            qwenModelSettingsFile = Path.Combine(stateDirectory, "qwen-model.txt");
+            codecSettingsFile = Path.Combine(stateDirectory, "qwen-codec.txt");
 
             Label title = new Label();
             title.Text = "CrispASR - Local Speech Server";
@@ -84,7 +145,7 @@ namespace ReadAloudCrispASRControl
             Controls.Add(title);
 
             Label subtitle = new Label();
-            subtitle.Text = "Start or stop your existing CosyVoice 3 server without Git Bash.";
+            subtitle.Text = "Choose CosyVoice or Qwen, find a local GGUF, then start the server.";
             subtitle.Location = new Point(23, 50);
             subtitle.Size = new Size(610, 24);
             Controls.Add(subtitle);
@@ -108,9 +169,67 @@ namespace ReadAloudCrispASRControl
             browse.Click += delegate { BrowseExe(); };
             Controls.Add(browse);
 
+            Label engineLabel = new Label();
+            engineLabel.Text = "Speech engine:";
+            engineLabel.Location = new Point(23, 145);
+            engineLabel.Size = new Size(600, 22);
+            Controls.Add(engineLabel);
+
+            engineSelect = new ComboBox();
+            engineSelect.DropDownStyle = ComboBoxStyle.DropDownList;
+            engineSelect.Location = new Point(23, 168);
+            engineSelect.Size = new Size(613, 27);
+            engineSelect.Items.Add("CosyVoice 3 GGUF - English (fleurs-en)");
+            engineSelect.Items.Add("Qwen3-TTS 1.7B CustomVoice (vivian)");
+            engineSelect.SelectedIndex = ReadPreference(backendSettingsFile) == QwenBackend ? 1 : 0;
+            Controls.Add(engineSelect);
+
+            Label modelLabel = new Label();
+            modelLabel.Text = "Local GGUF model (optional; blank uses CrispASR cache / may download missing files):";
+            modelLabel.Location = new Point(23, 205);
+            modelLabel.Size = new Size(610, 20);
+            Controls.Add(modelLabel);
+
+            modelInput = new TextBox();
+            modelInput.Location = new Point(23, 227);
+            modelInput.Size = new Size(493, 25);
+            Controls.Add(modelInput);
+
+            Button browseModel = new Button();
+            browseModel.Text = "Find model...";
+            browseModel.Location = new Point(524, 224);
+            browseModel.Size = new Size(112, 30);
+            browseModel.Click += delegate { BrowseModel(); };
+            Controls.Add(browseModel);
+
+            Label codecLabel = new Label();
+            codecLabel.Text = "Qwen tokenizer / codec GGUF (needed when choosing a Qwen model file):";
+            codecLabel.Location = new Point(23, 263);
+            codecLabel.Size = new Size(610, 20);
+            Controls.Add(codecLabel);
+
+            codecInput = new TextBox();
+            codecInput.Location = new Point(23, 285);
+            codecInput.Size = new Size(493, 25);
+            Controls.Add(codecInput);
+
+            browseCodec = new Button();
+            browseCodec.Text = "Find codec...";
+            browseCodec.Location = new Point(524, 282);
+            browseCodec.Size = new Size(112, 30);
+            browseCodec.Click += delegate { BrowseCodec(); };
+            Controls.Add(browseCodec);
+
+            rightsCheck = new CheckBox();
+            rightsCheck.Text = "I have rights to use the CosyVoice voice preset.";
+            rightsCheck.Location = new Point(23, 322);
+            rightsCheck.Size = new Size(615, 25);
+            rightsCheck.Checked = false;
+            Controls.Add(rightsCheck);
+
             status = new Label();
             status.Text = "Checking...";
-            status.Location = new Point(23, 155);
+            status.Location = new Point(23, 357);
             status.Size = new Size(610, 24);
             status.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             status.ForeColor = Color.FromArgb(78, 86, 102);
@@ -118,13 +237,13 @@ namespace ReadAloudCrispASRControl
 
             note = new Label();
             note.Text = "Server address: 127.0.0.1:18080";
-            note.Location = new Point(23, 180);
-            note.Size = new Size(615, 28);
+            note.Location = new Point(23, 384);
+            note.Size = new Size(615, 30);
             Controls.Add(note);
 
             startButton = new Button();
             startButton.Text = "Start server";
-            startButton.Location = new Point(23, 218);
+            startButton.Location = new Point(23, 422);
             startButton.Size = new Size(138, 38);
             startButton.BackColor = Color.FromArgb(216, 231, 255);
             startButton.Click += delegate { StartServer(); };
@@ -132,31 +251,34 @@ namespace ReadAloudCrispASRControl
 
             stopButton = new Button();
             stopButton.Text = "Stop server";
-            stopButton.Location = new Point(172, 218);
+            stopButton.Location = new Point(172, 422);
             stopButton.Size = new Size(138, 38);
             stopButton.Click += delegate { StopServer(); };
             Controls.Add(stopButton);
 
             Button refresh = new Button();
             refresh.Text = "Refresh";
-            refresh.Location = new Point(322, 218);
+            refresh.Location = new Point(322, 422);
             refresh.Size = new Size(118, 38);
             refresh.Click += delegate { RefreshStatus(); };
             Controls.Add(refresh);
 
             Button openDir = new Button();
             openDir.Text = "Open folder";
-            openDir.Location = new Point(451, 218);
+            openDir.Location = new Point(451, 422);
             openDir.Size = new Size(185, 38);
             openDir.Click += delegate { OpenFolder(); };
             Controls.Add(openDir);
 
             Label footer = new Label();
-            footer.Text = "You can close this controller while the server runs. Reopen it to stop the server.";
-            footer.Location = new Point(23, 275);
-            footer.Size = new Size(615, 26);
+            footer.Text = "Start/Stop is manual. Closing this window leaves your managed server running.";
+            footer.Location = new Point(23, 481);
+            footer.Size = new Size(615, 24);
             footer.ForeColor = Color.FromArgb(87, 95, 107);
             Controls.Add(footer);
+
+            engineSelect.SelectedIndexChanged += delegate { OnEngineChanged(); };
+            OnEngineChanged();
 
             refreshTimer = new Timer();
             refreshTimer.Interval = 1800;
@@ -195,6 +317,87 @@ namespace ReadAloudCrispASRControl
                     RefreshStatus();
                 }
             }
+        }
+
+        private static string ReadPreference(string file)
+        {
+            try { return File.Exists(file) ? File.ReadAllText(file, Encoding.UTF8).Trim() : ""; }
+            catch (Exception) { return ""; }
+        }
+
+        private void SavePreferences(string model, string codec)
+        {
+            try
+            {
+                Directory.CreateDirectory(stateDirectory);
+                File.WriteAllText(backendSettingsFile, SelectedBackend(), Encoding.UTF8);
+                File.WriteAllText(SelectedBackend() == QwenBackend ? qwenModelSettingsFile : cosyModelSettingsFile,
+                                  model, Encoding.UTF8);
+                if (SelectedBackend() == QwenBackend)
+                    File.WriteAllText(codecSettingsFile, codec, Encoding.UTF8);
+            }
+            catch (Exception) { /* preferences are optional; process ownership is separate */ }
+        }
+
+        private string SelectedBackend()
+        {
+            return engineSelect.SelectedIndex == 1 ? QwenBackend : CosyBackend;
+        }
+
+        private void OnEngineChanged()
+        {
+            bool qwen = SelectedBackend() == QwenBackend;
+            modelInput.Text = ReadPreference(qwen ? qwenModelSettingsFile : cosyModelSettingsFile);
+            codecInput.Text = qwen ? ReadPreference(codecSettingsFile) : "";
+            codecInput.Enabled = qwen;
+            browseCodec.Enabled = qwen;
+            rightsCheck.Enabled = !qwen;
+            rightsCheck.Checked = false;
+            RefreshStatus();
+        }
+
+        private void BrowseModel()
+        {
+            using (OpenFileDialog picker = new OpenFileDialog())
+            {
+                picker.Title = "Choose your local speech model (.gguf)";
+                picker.Filter = "GGUF model (*.gguf)|*.gguf";
+                picker.CheckFileExists = true;
+                if (picker.ShowDialog(this) != DialogResult.OK) return;
+                modelInput.Text = picker.FileName;
+                if (SelectedBackend() == QwenBackend && String.IsNullOrWhiteSpace(codecInput.Text))
+                {
+                    string sibling = Path.Combine(Path.GetDirectoryName(picker.FileName),
+                                                 "qwen3-tts-tokenizer-12hz.gguf");
+                    if (File.Exists(sibling)) codecInput.Text = sibling;
+                }
+                SavePreferences(modelInput.Text, codecInput.Text);
+            }
+        }
+
+        private void BrowseCodec()
+        {
+            using (OpenFileDialog picker = new OpenFileDialog())
+            {
+                picker.Title = "Choose your Qwen3-TTS tokenizer / codec GGUF";
+                picker.Filter = "GGUF codec (*.gguf)|*.gguf";
+                picker.CheckFileExists = true;
+                if (picker.ShowDialog(this) != DialogResult.OK)
+                    return;
+                codecInput.Text = picker.FileName;
+                SavePreferences(modelInput.Text, codecInput.Text);
+            }
+        }
+
+        private static string ValidateFile(string path, string label)
+        {
+            if (String.IsNullOrEmpty(path)) return null;
+            if (path.IndexOf('"') >= 0 || path.IndexOf('\r') >= 0 || path.IndexOf('\n') >= 0)
+                return label + " contains invalid characters.";
+            if (!File.Exists(path)) return label + " was not found. Browse for an existing local file.";
+            if (!String.Equals(Path.GetExtension(path), ".gguf", StringComparison.OrdinalIgnoreCase))
+                return label + " must be a .gguf file.";
+            return null;
         }
 
         private static bool PathsMatch(string a, string b)
@@ -336,7 +539,7 @@ namespace ReadAloudCrispASRControl
                     }
                     else
                     {
-                        Display("Stopped", "Press Start server to load your existing CosyVoice 3 GGUF model.",
+                        Display("Stopped", "Choose a GGUF or leave the model path blank to use cached/default weights.",
                                 Color.FromArgb(78, 86, 102), true, false);
                     }
                 }
@@ -348,11 +551,54 @@ namespace ReadAloudCrispASRControl
         {
             string exe = pathInput.Text.Trim().Trim('"');
             if (!File.Exists(exe) ||
-                !string.Equals(Path.GetFileName(exe), "crispasr.exe",
+                !String.Equals(Path.GetFileName(exe), "crispasr.exe",
                                StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show(this, "Select your existing crispasr.exe first.",
+                MessageBox.Show(this, "Select your existing crispasr.exe first. " +
+                                "Keep its matching CUDA DLLs alongside it.",
                                 "Executable not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            string backend = SelectedBackend();
+            string model = modelInput.Text.Trim().Trim('"');
+            string codec = backend == QwenBackend ? codecInput.Text.Trim().Trim('"') : "";
+            string invalid = ValidateFile(model, "Model");
+            if (invalid == null) invalid = ValidateFile(codec, "Qwen tokenizer / codec");
+            if (invalid != null)
+            {
+                MessageBox.Show(this, invalid, "Invalid model selection",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (backend == CosyBackend && !rightsCheck.Checked)
+            {
+                MessageBox.Show(this, "Confirm your rights to the CosyVoice preset before starting.",
+                                "Voice rights", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (backend == QwenBackend && !String.IsNullOrEmpty(model) && String.IsNullOrEmpty(codec))
+            {
+                string sibling = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(model)),
+                                               "qwen3-tts-tokenizer-12hz.gguf");
+                if (File.Exists(sibling))
+                {
+                    codec = sibling;
+                    codecInput.Text = sibling;
+                }
+                else
+                {
+                    MessageBox.Show(this, "You selected a Qwen model file. Please also find its " +
+                                    "qwen3-tts-tokenizer-12hz.gguf codec using Find codec. " +
+                                    "For your previously cached model, you can instead leave both paths blank.",
+                                    "Qwen codec required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+            if (backend == QwenBackend && String.IsNullOrEmpty(model) && !String.IsNullOrEmpty(codec))
+            {
+                MessageBox.Show(this, "Either choose both Qwen model and codec files, " +
+                                "or leave both blank to use the cached/default models.",
+                                "Qwen model missing", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -361,21 +607,19 @@ namespace ReadAloudCrispASRControl
                 if (existing != null || GetHealth() != null || PortOccupied())
                 {
                     MessageBox.Show(this, "Port 18080 is already in use or your server is starting. " +
-                                  "Do not run a second server on the same port.",
+                                    "Stop the existing engine before switching to another model.",
                                     "Already running", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     RefreshStatus();
                     return;
                 }
             }
-
             try
             {
                 ProcessStartInfo info = new ProcessStartInfo();
                 info.FileName = Path.GetFullPath(exe);
-                info.Arguments = MakeArguments();
+                info.Arguments = MakeArguments(backend, model, codec);
                 info.WorkingDirectory = Path.GetDirectoryName(info.FileName);
-                // A minimized native console keeps error messages available
-                // even after the small controller itself has been closed.
+                // Runs only the chosen executable, never through cmd/PowerShell.
                 info.UseShellExecute = true;
                 info.WindowStyle = ProcessWindowStyle.Minimized;
                 using (Process started = Process.Start(info))
@@ -383,6 +627,7 @@ namespace ReadAloudCrispASRControl
                     if (started == null) throw new InvalidOperationException("Could not start the server.");
                     StoreOwned(started, info.FileName);
                 }
+                SavePreferences(model, codec);
                 RefreshStatus();
             }
             catch (Exception ex)
